@@ -10,6 +10,11 @@ from core.config import ConfigLoader
 def create_full_args(**overrides):
     """完全なargparse.Namespaceを作成するヘルパー"""
     defaults = {
+        'target_dir': None,
+        'output_file': None,
+        'format': 'text',
+        'head': None,
+        'tail': None,
         'yes': False,
         'tree': False,
         'list': False,
@@ -17,6 +22,8 @@ def create_full_args(**overrides):
         'stats': False,
         'debug': False,
         'no_merge': False,
+        'stdout': False,
+        'no_auto_ignore': False,
         'ignore_file': None,
         'replace_file': None,
         'glob': None,
@@ -35,7 +42,7 @@ class TestConfigLoaderLoad:
         
         assert config == {}
 
-    def test_load_specific_config_file(self, tmp_path):
+    def test_load_specific_config_file(self, tmp_path, capsys):
         """指定された設定ファイル"""
         config_file = tmp_path / "my_config.yaml"
         config_file.write_text("tree: true\nsanitize: true\n")
@@ -44,51 +51,29 @@ class TestConfigLoaderLoad:
         
         assert config['tree'] is True
         assert config['sanitize'] is True
-
-    def test_load_default_config_yaml(self, tmp_path, monkeypatch):
-        """デフォルト設定ファイル（.config.yaml）"""
-        monkeypatch.chdir(tmp_path)
         
-        config_file = tmp_path / ".config.yaml"
-        config_file.write_text("tree: true\ndebug: false\n")
-        
-        config = ConfigLoader.load()
-        
-        assert config.get('tree') is True
-        assert config.get('debug') is False
-
-    def test_load_default_config_yml(self, tmp_path, monkeypatch):
-        """デフォルト設定ファイル（.config.yml）"""
-        monkeypatch.chdir(tmp_path)
-        
-        config_file = tmp_path / ".config.yml"
-        config_file.write_text("tree: true\n")
-        
-        config = ConfigLoader.load()
-        
-        assert config.get('tree') is True
+        # 設定が表示される
+        captured = capsys.readouterr()
+        assert "Loaded configuration from:" in captured.out
 
     def test_load_nonexistent_file(self):
         """存在しないファイル"""
-        config = ConfigLoader.load(config_path="/nonexistent/config.yaml")
+        with pytest.raises(SystemExit) as exc_info:
+            ConfigLoader.load(config_path="/nonexistent/config.yaml")
         
-        assert config == {}
+        assert exc_info.value.code == 1
 
-    def test_load_invalid_yaml(self, tmp_path, capsys):
+    def test_load_invalid_yaml(self, tmp_path):
         """無効なYAML"""
         config_file = tmp_path / "invalid.yaml"
-        config_file.write_text("invalid: yaml: content: broken")
+        config_file.write_text("invalid: yaml: content: broken\n  bad indent")
         
-        config = ConfigLoader.load(config_path=str(config_file))
+        with pytest.raises(SystemExit) as exc_info:
+            ConfigLoader.load(config_path=str(config_file))
         
-        # エラーメッセージが出力される
-        captured = capsys.readouterr()
-        assert "Warning" in captured.out or "Error" in captured.out
-        
-        # 空の設定が返る
-        assert config == {}
+        assert exc_info.value.code == 1
 
-    def test_load_empty_yaml(self, tmp_path):
+    def test_load_empty_yaml(self, tmp_path, capsys):
         """空のYAMLファイル"""
         config_file = tmp_path / "empty.yaml"
         config_file.write_text("")
@@ -97,7 +82,7 @@ class TestConfigLoaderLoad:
         
         assert config == {}
 
-    def test_load_yaml_with_comments(self, tmp_path):
+    def test_load_yaml_with_comments(self, tmp_path, capsys):
         """コメント付きYAML"""
         config_file = tmp_path / "config.yaml"
         config_file.write_text("""
@@ -112,9 +97,75 @@ sanitize: false
         assert config['tree'] is True
         assert config['sanitize'] is False
 
+    def test_load_yaml_with_quoted_yes(self, tmp_path):
+        """'yes'キーをクォートしたYAML"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("""
+'yes': true
+tree: true
+""")
+        
+        config = ConfigLoader.load(config_path=str(config_file))
+        
+        assert config['yes'] is True
+        assert config['tree'] is True
+
 
 class TestConfigLoaderMerge:
     """設定とコマンドライン引数のマージのテスト"""
+
+    def test_merge_input_output_from_config(self):
+        """入出力オプションを設定からマージ"""
+        config = {
+            'input': '/path/to/input',
+            'output': '/path/to/output.txt',
+            'format': 'markdown'
+        }
+        args = create_full_args()
+        
+        merged = ConfigLoader.merge_with_args(config, args)
+        
+        assert merged.target_dir == '/path/to/input'
+        assert merged.output_file == '/path/to/output.txt'
+        assert merged.format == 'markdown'
+
+    def test_merge_input_output_args_override(self):
+        """入出力オプション - 引数が優先"""
+        config = {
+            'input': '/config/input',
+            'output': '/config/output.txt'
+        }
+        args = create_full_args(
+            target_dir='/args/input',
+            output_file='/args/output.txt'
+        )
+        
+        merged = ConfigLoader.merge_with_args(config, args)
+        
+        assert merged.target_dir == '/args/input'
+        assert merged.output_file == '/args/output.txt'
+
+    def test_merge_integer_options(self):
+        """整数オプションのマージ"""
+        config = {
+            'head': 100,
+            'tail': 50
+        }
+        args = create_full_args()
+        
+        merged = ConfigLoader.merge_with_args(config, args)
+        
+        assert merged.head == 100
+        assert merged.tail == 50
+
+    def test_merge_integer_options_args_override(self):
+        """整数オプション - 引数が優先"""
+        config = {'head': 100}
+        args = create_full_args(head=200)
+        
+        merged = ConfigLoader.merge_with_args(config, args)
+        
+        assert merged.head == 200
 
     def test_merge_boolean_flags_from_config(self):
         """設定からBooleanフラグをマージ"""
@@ -237,7 +288,9 @@ class TestConfigLoaderMerge:
             'sanitize': True,
             'stats': True,
             'debug': True,
-            'no_merge': True
+            'no_merge': True,
+            'stdout': True,
+            'no_auto_ignore': True
         }
         args = create_full_args()
         
@@ -250,6 +303,8 @@ class TestConfigLoaderMerge:
         assert merged.stats is True
         assert merged.debug is True
         assert merged.no_merge is True
+        assert merged.stdout is True
+        assert merged.no_auto_ignore is True
 
     def test_merge_empty_config(self):
         """空の設定"""
@@ -328,6 +383,15 @@ class TestConfigLoaderIntegration:
         """全オプションを含む設定"""
         config_file = tmp_path / "full_config.yaml"
         config_file.write_text("""
+# Input/Output
+input: /path/to/input
+output: /path/to/output.txt
+format: markdown
+
+# Integer options
+head: 100
+tail: 50
+
 # Boolean flags
 tree: true
 list: true
@@ -335,6 +399,7 @@ sanitize: true
 stats: true
 debug: true
 no_merge: false
+'yes': true
 
 # File paths
 ignore_file: '.gitignore'
@@ -353,13 +418,47 @@ exclude:
         
         config = ConfigLoader.load(config_path=str(config_file))
         
+        assert config.get('input') == '/path/to/input'
+        assert config.get('output') == '/path/to/output.txt'
+        assert config.get('format') == 'markdown'
+        assert config.get('head') == 100
+        assert config.get('tail') == 50
         assert config.get('tree') is True
         assert config.get('list') is True
         assert config.get('sanitize') is True
         assert config.get('stats') is True
         assert config.get('debug') is True
         assert config.get('no_merge') is False
+        assert config.get('yes') is True
         assert config.get('ignore_file') == '.gitignore'
         assert config.get('replace_file') == 'replace.txt'
         assert len(config.get('glob', [])) == 3
         assert len(config.get('exclude', [])) == 3
+
+    def test_load_and_merge_workflow(self, tmp_path):
+        """設定ファイル読み込みとマージの統合テスト"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("""
+input: /config/path
+output: /config/output.txt
+tree: true
+glob:
+  - '*.py'
+""")
+        
+        # 設定ファイル読み込み
+        config = ConfigLoader.load(config_path=str(config_file))
+        
+        # コマンドライン引数
+        args = create_full_args(output_file='/args/output.txt')
+        
+        # マージ
+        merged = ConfigLoader.merge_with_args(config, args)
+        
+        # 設定ファイルの値
+        assert merged.target_dir == '/config/path'
+        assert merged.tree is True
+        assert merged.glob == ['*.py']
+        
+        # コマンドライン引数が優先
+        assert merged.output_file == '/args/output.txt'

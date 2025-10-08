@@ -12,174 +12,205 @@ AI駆動開発におけるコードベースの抽象化と管理の支援ツー
 - **ファイル一覧表示** - 対象ファイルのリストアップ
 - **部分的な内容抽出** - 各ファイルの先頭/末尾N行のみ抽出
 - **機密情報のサニタイズ** - IPアドレス、メール、APIキーなどの自動置換
-- **設定ファイル対応** - `.config.yaml`でデフォルト設定を管理
+- **設定ファイル対応** - コマンドラインオプションをYAMLで指定可能
 
 ## インストール
 
-```bash
-git clone git@github.com:remokasu/kasu.git
-cd kasu
-pip install -e .
-```
+- pypiからインストール
+    ```bash
+    pip install kasu
+    ```
+
+- ソースからインストール
+    ```bash
+    git clone git@github.com:remokasu/kasu.git
+    cd kasu
+    pip install -e .
+    ```
 
 ## クイックスタート
-```bash
-ks -i [INPUT_DIR] -o [OUTPUT_FILE]
+
+### 基本的な使い方（カレントディレクトリを結合）
+``` bash
+ks -i . -o output.txt
+```
+### Markdown形式で出力
+``` bash
+ks -i . -o output.md --format md
+```
+### Pythonファイルだけを対象に
+``` bash
+ks -i . -o output.md -g "*.py" --format md
 ```
 
 ## 使い方
 
-- ### 指定したディレクトリ以下のテキストファイルを結合して1ファイルに出力
+### 指定したディレクトリ以下のテキストファイルを結合して1ファイルに出力
 
-    - プレーンテキストで出力
+- プレーンテキストで出力
 
-        ```bash
-        ks -i [DIR] -o [FILE]
-        ``` 
+    ```bash
+    ks -i [DIR] -o [FILE]
+    ``` 
 
-    - Markdown形式で出力
+- Markdown形式で出力
 
-        ```bash
-        ks -i [DIR] -o [FILE.md] --format md
-        ```
+    ```bash
+    ks -i [DIR] -o [FILE.md] --format md
+    ```
 
-        または
+    または
 
-        ```bash
-        ks -i [DIR] -o [FILE.md] -f md
-        ```
-    
-    - 標準出力に出力
+    ```bash
+    ks -i [DIR] -o [FILE.md] -f md
+    ```
 
-        ```bash
-        ks -i [DIR] --stdout
-        ```
+- 標準出力に出力
 
-- ### tree 情報を出力
-    - 標準出力に出力
-        ```bash
-        ks -i [DIR] --tree
-        ```
-        または
-        ```bash
-        ks -i [DIR] -t
-        ```
+    ```bash
+    ks -i [DIR] --stdout
+    ```
 
-    - `-o` で指定したファイルの先頭に出力
-        ```bash
-        ks -i [DIR] -o [FILE] --tree
-        ```
-        または
-        ```bash
-        ks -i [DIR] -o [FILE] -t
-        ```
-        - i で指定したディレクトリ以下のファイル内容が続きます。
+### tree 情報を出力
 
-    - `-o` で指定したファイルにtree情報のみを出力
-        ```bash
-        ks -i [DIR] -o [FILE] --tree --no-merge
-        ```
-        `--no-merge`を指定することで、-iで指定したディレクトリ以下のファイル内容は出力されません。
+- 標準出力に出力
+    ```bash
+    ks -i [DIR] --tree
+    ```
+    または
+    ```bash
+    ks -i [DIR] -t
+    ```
 
-    - 出力例
+- `-o` で指定したファイルの先頭に出力
+    ```bash
+    ks -i [DIR] -o [FILE] --tree
+    ```
+    または
+    ```bash
+    ks -i [DIR] -o [FILE] -t
+    ```
+    - i で指定したディレクトリ以下のファイル内容が続きます。
 
-        ```
-        Auto-detected and using: ./.gitignore
-        Scanning files...
-        Found 5 files
-        Ignored by patterns: 2 files/directories
+- `-o` で指定したファイルにtree情報のみを出力
+    ```bash
+    ks -i [DIR] -o [FILE] --tree --no-merge
+    ```
+    `--no-merge`を指定することで、-iで指定したディレクトリ以下のファイル内容は出力されません。
 
-        Directory tree:
-        example-project/
-        ├── docs/
-        │   └── README.md
-        ├── src/
-        │   ├── config.json
-        │   ├── main.py
-        │   └── utils.py
-        └── tests/
-            └── test_main.py
-        ```
+- 出力例
 
-- ### ファイル一覧を標準出力に出力
-    - 標準出力に出力
+    ```
+    Auto-detected and using: ./.gitignore
+    Scanning files...
+    Found 5 files
+    Ignored by patterns: 2 files/directories
 
-        ```bash
-        ks -i [DIR] --list
-        ```
-        または
-        ```bash
-        ks -i [DIR] -l
-        ```
-    - `-o`で指定したファイルの先頭に出力
-        ```bash
-        ks -i [DIR] -o [FILE] --list
-        ```
-        または
-        ```bash
-        ks -i [DIR] -o [FILE] -l
-        ```
-        `-i` で指定したディレクトリ以下のファイル内容が続きます。
+    Directory tree:
+    example-project/
+    ├── docs/
+    │   └── README.md
+    ├── src/
+    │   ├── config.json
+    │   ├── main.py
+    │   └── utils.py
+    └── tests/
+        └── test_main.py
+    ```
 
-    - `-o` で指定したファイルにファイル一覧のみを出力
-        ```bash
-        ks -i [DIR] -o [FILE] --list --no-merge
-        ```
-        `--no-merge`を指定することで、`-i`で指定したディレクトリ以下のファイル内容は出力されません。
+### ファイル一覧を標準出力に出力
 
-    - 出力例
-        ```
-        Auto-detected and using: ./.gitignore
-        Scanning files...
-        Found 5 files
-        Ignored by patterns: 2 files/directories
+- 標準出力に出力
 
-        File list:
-        tests/test_main.py
-        src/utils.py
-        src/config.json
-        src/main.py
-        docs/README.md
-        ```
+    ```bash
+    ks -i [DIR] --list
+    ```
+    または
+    ```bash
+    ks -i [DIR] -l
+    ```
+- `-o`で指定したファイルの先頭に出力
+    ```bash
+    ks -i [DIR] -o [FILE] --list
+    ```
+    または
+    ```bash
+    ks -i [DIR] -o [FILE] -l
+    ```
+    `-i` で指定したディレクトリ以下のファイル内容が続きます。
 
-- ### 条件を指定して対象ファイルを絞り込み
+- `-o` で指定したファイルにファイル一覧のみを出力
+    ```bash
+    ks -i [DIR] -o [FILE] --list --no-merge
+    ```
+    `--no-merge`を指定することで、`-i`で指定したディレクトリ以下のファイル内容は出力されません。
 
-    - `-g`で含めるファイルパターンを指定します。
+- 出力例
+    ```
+    Auto-detected and using: ./.gitignore
+    Scanning files...
+    Found 5 files
+    Ignored by patterns: 2 files/directories
 
-        例: `-g "*.py"` で拡張子が.pyのファイルのみ対象にします。
+    File list:
+    tests/test_main.py
+    src/utils.py
+    src/config.json
+    src/main.py
+    docs/README.md
+    ```
 
-        ```bash
-        ks -i [DIR] -o [FILE] -g "*.py"
-        ```
+### 条件を指定して対象ファイルを絞り込み
 
-        複数指定
-        ```bash
-        ks -i [DIR] -o [FILE] -g "*.py" "*.md"
-        ```
+- `-g`で含めるファイルパターンを指定します。
 
-- ### 対象から特定のファイルを除外
-    - `-i`で指定したディレクトリ以下に.gitignoreがあれば自動的に除外します。
+    例: `-g "*.py"` で拡張子が.pyのファイルのみ対象にします。
 
-    - `--ignore`で、除去対象を記載したファイルを指定できます。
+    ```bash
+    ks -i [DIR] -o [FILE] -g "*.py"
+    ```
 
-        このファイルは.gitignoreと同じ書き方ができます。
+    複数指定
+    ```bash
+    ks -i [DIR] -o [FILE] -g "*.py" "*.md"
+    ```
 
-        `--ignore` を指定した時は`.gitignore` は無視されます。
+### 対象から特定のファイルを除外
+- `-i`で指定したディレクトリ以下に.gitignoreがあれば自動的に除外します。
 
-    - `--no-auto-ignore`で.gitignoreの自動検出を無効化できます。
+- `--ignore`で、除去対象を記載したファイルを指定できます。
 
-    - `-x`で指定したパターンを除外します。
+    このファイルは.gitignoreと同じ書き方ができます。
 
-        もし対処に.gitignoreがあり、かつREADME.mdを除外したい場合、以下のようにします。
-        ```bash
-        ks -i [DIR] -o [FILE] -x "README.md"
-        ```
+    `--ignore` を指定した時は`.gitignore` は無視されます。
 
-- ### サニタイズ
-    コンフィデンシャルな情報を自動的に検出して置換します。
-    
-    ただし、確実に検出できるわけではありません。
+- `--no-auto-ignore`で.gitignoreの自動検出を無効化できます。
 
+- `-x`で指定したパターンを除外します。
+
+    もし対象に.gitignoreがあり、かつREADME.mdを除外したい場合、以下のようにします。
+    ```bash
+    ks -i [DIR] -o [FILE] -x "README.md"
+    ```
+
+### サニタイズ
+
+- コンフィデンシャルな情報を自動的に検出して置換します。
+
+- ただし、確実に検出できるわけではありません。
+
+- `--sanitize`を指定します。
+
+    ```bash
+    ks -i [DIR] -o [FILE] --sanitize
+    ```
+    または
+    ```bash
+    ks -i [DIR] -o [FILE] -s
+    ```
+
+
+- 検出するパターン
     1. APIキー: api_key=, apikey=, api-secret= などの後に続く20文字以上の英数字を検出
         ```
         置換形式: [REDACTED_API_KEY_1], [REDACTED_API_KEY_2], ...
@@ -210,62 +241,65 @@ ks -i [INPUT_DIR] -o [OUTPUT_FILE]
         置換形式: [REDACTED_PRIVATE_KEY]
         ```
 
-- ### 置換パターンを指定
+### 置換パターンを指定
     
-    - フォーマット
+パターンファイルを指定して、カスタム置換を行うことができます。
+
+- パターンファイルフォーマット
+    - pattern_file.txt(名前は任意)
         ```
-        変換前 変換後
+        tanaka.ichiro@group.go.jp hoge@hoge.com
+        田中一郎 ほげ山ほげ男
+        Company Inc. ほげほげ会社
         ```
 
-    - 例
-        ```bash
-        ks -i [DIR] -o [FILE] --replace [PATTERN_FILE]
-        ```
-        または
-        ```bash
-        ks -i [DIR] -o [FILE] -r [PATTERN_FILE]
-        ```
+    - 左側が置換対象、右側が置換後の文字列です。上記の例では以下の置換が行われます。
+        - tanaka.ichiro@group.go.jp → hoge@hoge.com
+        - 田中一郎 → ほげ山ほげ男
+        - Company Inc. → ほげほげ会社
 
-- ### 各ファイルの先頭/末尾N行のみ出力
+- 指定方法
+    ```bash
+    ks -i [DIR] -o [FILE] --replace [PATTERN_FILE]
+    ```
+    または
+    ```bash
+    ks -i [DIR] -o [FILE] -r [PATTERN_FILE]
+    ```
 
-    - 先頭N行
-        ```bash
-        ks -i [DIR] -o [FILE] --head N
-        ```
-    - 末尾N行
-        ```bash
-        ks -i [DIR] -o [FILE] --tail N
-        ```
+### 各ファイルの先頭/末尾N行のみ出力
 
-- ### 設定ファイルを指定
+- 先頭N行
+    ```bash
+    ks -i [DIR] -o [FILE] --head N
+    ```
+- 末尾N行
+    ```bash
+    ks -i [DIR] -o [FILE] --tail N
+    ```
 
-    - `--config [FILE]`, または `-c [FILE]`で設定ファイルを指定できます。
+### 設定ファイルを指定
 
-    - 設定ファイルの例
-        ```yaml
-        input: .
-        output: output.md
-        format: md
-        glob:
-          - "*.py"
-          - "*.md"
-        exclude:
-          - "tests/"
-          - "docs/"
-        head: 50
-        sanitize: true
-        ```
+- `--config [FILE]`, または `-c [FILE]`で設定ファイルを指定できます。
 
-    - コマンドラインオプションで指定した値が優先されます。
+    ``` bash
+    ks --config config.yaml
+    ```
 
-    - 例
-        ```bash
-        ks --config config.yaml
-        ```
-        または
-        ```bash
-        ks -c config.yaml
-        ```
+- config.yaml
+    ```yaml
+    input: .
+    output: output.md
+    format: md
+    glob:
+    - "*.py"
+    - "*.md"
+    exclude:
+    - "tests/"
+    - "docs/"
+    head: 50
+    sanitize: true
+    ```
 
 
 ## コマンドラインオプション一覧

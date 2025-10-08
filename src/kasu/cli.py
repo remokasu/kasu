@@ -1,4 +1,3 @@
-"""CLIエントリーポイント"""
 import argparse
 import sys
 import os
@@ -15,9 +14,7 @@ from utils.tree import TreeBuilder
 from utils.list import ListBuilder
 
 
-
 def main():
-    """CLI エントリーポイント"""
     parser = argparse.ArgumentParser(
         description="Merge all text files in a directory into one output.",
         epilog="Examples:\n"
@@ -32,7 +29,9 @@ def main():
                "  ks -i . -o output.txt -g 'src/**/*.py'      # Recursive pattern\n"
                "  ks -i . -o output.txt -x 'README.md'        # Exclude specific files\n"
                "  ks -i . -o output.txt -g '*.py' -x 'test_*' # Combine glob and exclude\n"
-               "  ks -i project/ -o out.txt -s                # Specify input/output\n",
+               "  ks -i project/ -o out.txt -s                # Auto-sanitize sensitive info\n"
+               "  ks --config config.yaml                     # Use config file\n"
+               "  ks -c config.yaml -o custom.txt             # Config + override\n",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
 
@@ -42,7 +41,6 @@ def main():
         "--input", "-i",
         dest="target_dir",
         metavar="DIR",
-        required=True,
         help="Directory to search for text files"
     )
     io_group.add_argument(
@@ -161,14 +159,19 @@ def main():
     parser.add_argument(
         "--config", "-c",
         metavar="FILE",
-        help="Configuration file path"
+        dest="config_file",
+        help="Configuration file path (YAML format)"
     )
 
     args = parser.parse_args()
 
     # 設定ファイルを読み込み
-    config = ConfigLoader.load(args.config)
+    config = ConfigLoader.load(args.config_file)
     args = ConfigLoader.merge_with_args(config, args)
+
+    # target_dirのチェック（設定ファイルマージ後に実施）
+    if not args.target_dir:
+        parser.error("--input/-i is required (either via command line or config file)")
 
     # 表示のみモード（tree, stats, list のいずれか）
     display_only_mode = (args.tree or args.stats or args.list) \

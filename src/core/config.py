@@ -4,16 +4,11 @@ import sys
 import yaml
 from typing import Dict, Any, Optional
 import argparse
+import re
 
 
 class ConfigLoader:
     """設定ファイルの読み込みを管理"""
-
-    DEFAULT_CONFIG_FILES = [
-        '.config.yaml',
-        '.config.yml',
-        '.config'
-    ]
 
     @classmethod
     def load(cls, config_path: Optional[str] = None) -> Dict[str, Any]:
@@ -21,7 +16,7 @@ class ConfigLoader:
         設定ファイルを読み込む
 
         Args:
-            config_path: 設定ファイルのパス（Noneの場合は自動検索）
+            config_path: 設定ファイルのパス
 
         Returns:
             設定内容の辞書
@@ -29,25 +24,61 @@ class ConfigLoader:
         config = {}
 
         if config_path:
-            config_files = [config_path]
-        else:
-            config_files = cls.DEFAULT_CONFIG_FILES
-
-        for config_file in config_files:
-            if os.path.exists(config_file):
-                try:
-                    with open(config_file, 'r', encoding='utf-8') as f:
-                        loaded_config = yaml.safe_load(f)
-                        if loaded_config:
-                            config = loaded_config
-                            print(f"Loaded config from: {config_file}")
-                            break
-                except yaml.YAMLError as e:
-                    print(f"Warning: Error parsing config file {config_file}: {e}")
-                except Exception as e:
-                    print(f"Warning: Error reading config file {config_file}: {e}")
+            # 明示的に指定されたファイルが存在しない場合はエラー
+            if not os.path.exists(config_path):
+                print(f"Error: Config file not found: {config_path}", file=sys.stderr)
+                sys.exit(1)
+            
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    loaded_config = yaml.safe_load(f)
+                    if loaded_config:
+                        config = loaded_config
+                        cls._print_config(config, config_path)
+            except yaml.YAMLError as e:
+                print(f"Error: Invalid YAML in config file {config_path}: {e}", file=sys.stderr)
+                sys.exit(1)
+            except Exception as e:
+                print(f"Error: Cannot read config file {config_path}: {e}", file=sys.stderr)
+                sys.exit(1)
 
         return config
+
+    @staticmethod
+    def _print_config(config: Dict[str, Any], config_path: str, line_length: int = 80) -> None:
+        """
+        設定内容を整形して表示
+
+        Args:
+            config: 設定内容
+            config_path: 設定ファイルのパス
+            line_length: 区切り線の長さ
+        """
+        try:
+            from colorama import Fore, Style, init
+            init(autoreset=True)
+            use_color = True
+        except ImportError:
+            use_color = False
+
+        print("=" * line_length)
+        if use_color:
+            print(f"{Fore.GREEN}Loaded configuration from: {Fore.CYAN}{config_path}{Style.RESET_ALL}")
+        else:
+            print(f"Loaded configuration from: {config_path}")
+        print("-" * line_length)
+        
+        yaml_str = yaml.dump(config, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        
+        for line in yaml_str.splitlines():
+            if use_color:
+                # キー部分を黄色でハイライト
+                line = re.sub(r'^(\s*)(\w+):', rf'\1{Fore.YELLOW}\2{Fore.RESET}:', line)
+                # 文字列値を緑でハイライト
+                line = re.sub(r': (["\'].*["\'])', rf': {Fore.GREEN}\1{Fore.RESET}', line)
+            print(line)
+        
+        print("=" * line_length)
 
     @staticmethod
     def merge_with_args(config: Dict[str, Any], args: argparse.Namespace) -> argparse.Namespace:
@@ -62,8 +93,25 @@ class ConfigLoader:
         Returns:
             マージされた設定
         """
+        # Input/Output options (コマンドラインで指定されていない場合のみ設定ファイルから読み込む)
+        if getattr(args, 'target_dir', None) is None and 'input' in config:
+            args.target_dir = config['input']
+        
+        if getattr(args, 'output_file', None) is None and 'output' in config:
+            args.output_file = config['output']
+        
+        if getattr(args, 'format', None) == 'text' and 'format' in config:  # デフォルト値の場合
+            args.format = config['format']
+        
+        # Integer options
+        if getattr(args, 'head', None) is None and 'head' in config:
+            args.head = config['head']
+        
+        if getattr(args, 'tail', None) is None and 'tail' in config:
+            args.tail = config['tail']
+
         # Boolean flags
-        for key in ['yes', 'tree', 'list', 'sanitize', 'stats', 'debug',  'no_merge']:
+        for key in ['yes', 'tree', 'list', 'sanitize', 'stats', 'debug', 'no_merge', 'stdout', 'no_auto_ignore']:
             if not getattr(args, key, False) and config.get(key, False):
                 setattr(args, key, True)
 
