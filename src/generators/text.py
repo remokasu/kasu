@@ -1,5 +1,6 @@
 """テキスト形式のジェネレータ"""
 import sys
+import os
 from typing import List, Dict, Tuple, Optional
 
 from generators.base import ContentGenerator
@@ -31,6 +32,9 @@ class TextGenerator(ContentGenerator):
         all_stats = {}
 
         sanitizer = Sanitizer(enable_sanitize, custom_replacements)
+
+        # ベースディレクトリ名を取得
+        base_name = os.path.basename(os.path.abspath(target_dir))
 
         # # プロジェクト名
         # project_name = os.path.basename(os.path.abspath(target_dir))
@@ -80,7 +84,17 @@ class TextGenerator(ContentGenerator):
             # content_parts.append("=== Files ===\n\n")
             for file_info in target_files:
                 file_path = file_info['path']
-                content_parts.append(f"--- {file_path} ---\n")
+
+                # 指定ディレクトリをルートとした絶対パス風に変換
+                try:
+                    rel_path = os.path.relpath(file_path, target_dir)
+                    # パスの区切り文字を統一（Unixスタイル）
+                    display_path = '/' + rel_path.replace(os.sep, '/')
+                except ValueError:
+                    # 異なるドライブなどで相対パスが作れない場合
+                    display_path = file_path
+
+                content_parts.append(f"--- {display_path} ---\n")
 
                 try:
                     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:

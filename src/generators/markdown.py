@@ -104,10 +104,18 @@ class MarkdownGenerator(ContentGenerator):
 
             for file_info in target_files:
                 file_path = file_info['path']
+
+                # 指定ディレクトリをルートとした絶対パス風に変換
+                try:
+                    rel_path = os.path.relpath(file_path, target_dir)
+                    display_path = '/' + rel_path.replace(os.sep, '/')
+                except ValueError:
+                    display_path = file_path
+
                 language = LanguageMapper.get_language(file_path)
 
                 # ファイル名をヘッダーに
-                content_parts.append(f"### `{file_path}`\n\n")
+                content_parts.append(f"### `{display_path}`\n\n")
 
                 try:
                     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
