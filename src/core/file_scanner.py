@@ -23,33 +23,19 @@ class FileScanner:
         }
 
     def scan(self, target_dir: str) -> List[Dict[str, any]]:
-        """
-        ディレクトリをスキャンしてファイル情報を収集
-
-        Args:
-            target_dir: スキャン対象ディレクトリ
-
-        Returns:
-            ファイル情報のリスト
-        """
+        """ディレクトリをスキャンしてファイル情報を収集"""
         target_files = []
-        # 統計をリセット
         self.stats = {
             'scanned': 0,
             'glob_filtered': 0,
             'ignored': 0,
-            'non_text': 0,
-            'size_filtered': 0,
             'included': 0
         }
 
-        # シンボリックリンクを追跡しない（無限ループ防止）
         for root, dirs, files in os.walk(target_dir, followlinks=False):
-            # ディレクトリフィルタ適用
             original_dirs = dirs[:]
             dirs[:] = [d for d in dirs if self._should_include_dir(os.path.join(root, d))]
 
-            # 除外されたディレクトリをカウント
             if len(original_dirs) != len(dirs):
                 removed_count = len(original_dirs) - len(dirs)
                 self.stats['ignored'] += removed_count
@@ -57,7 +43,6 @@ class FileScanner:
             for file in files:
                 file_path = os.path.join(root, file)
 
-                # シンボリックリンクはスキップ
                 if os.path.islink(file_path):
                     if self.debug:
                         print(f"[SKIPPED SYMLINK] {file_path}")
@@ -65,24 +50,18 @@ class FileScanner:
 
                 self.stats['scanned'] += 1
 
-                # 全フィルタを適用（どのフィルタで除外されたか記録）
                 filter_result = self._apply_filters(file_path)
                 if filter_result != 'included':
                     if filter_result in self.stats:
                         self.stats[filter_result] += 1
                     continue
 
-                # テキストファイル判定
-                if self._is_text_file(file_path):
-                    file_info = self._get_file_info(file_path)
-                    target_files.append(file_info)
-                    self.stats['included'] += 1
-                    if self.debug:
-                        print(f"[ADDED] {file_path}")
-                else:
-                    self.stats['non_text'] += 1
-                    if self.debug:
-                        print(f"[SKIPPED NON-TEXT] {file_path}")
+                # テキスト判定を削除 - 全てのファイルを対象とする
+                file_info = self._get_file_info(file_path)
+                target_files.append(file_info)
+                self.stats['included'] += 1
+                if self.debug:
+                    print(f"[ADDED] {file_path}")
 
         return target_files
 

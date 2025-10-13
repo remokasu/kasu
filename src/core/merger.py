@@ -76,10 +76,10 @@ class Merger:
             print(f"Filtered by glob: {scan_stats['glob_filtered']} files", file=output_stream)
         if scan_stats['ignored'] > 0:
             print(f"Ignored by patterns: {scan_stats['ignored']} files/directories", file=output_stream)
-        if scan_stats['size_filtered'] > 0:
-            print(f"Filtered by size: {scan_stats['size_filtered']} files", file=output_stream)
-        if scan_stats['non_text'] > 0:
-            print(f"Skipped non-text: {scan_stats['non_text']} files", file=output_stream)
+        # if scan_stats['size_filtered'] > 0:
+        #     print(f"Filtered by size: {scan_stats['size_filtered']} files", file=output_stream)
+        # if scan_stats['non_text'] > 0:
+        #     print(f"Skipped non-text: {scan_stats['non_text']} files", file=output_stream)
 
         # ツリー構造を取得（show_tree が True の場合のみ）
         tree_output = None
