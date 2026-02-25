@@ -139,6 +139,7 @@ def main():
     search_group.add_argument(
         "--grep",
         dest="grep_pattern",
+        action="append",
         metavar="PATTERN",
         help="Extract lines matching pattern with surrounding context"
     )

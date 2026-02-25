@@ -136,6 +136,11 @@ ks -i ./src -o output.txt --root .
 ks -i . -o output.txt --grep "JWT" --context 3
 ```
 
+複数指定:
+```bash
+ks -i . -o output.txt --grep "JWT" --grep "OAuth"
+```
+
 正規表現で検索する場合:
 ```bash
 ks -i . -o output.txt --grep "token_[0-9a-f]{32}" --regex

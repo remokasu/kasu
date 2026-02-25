@@ -16,7 +16,7 @@ class ContentGenerator(ABC):
         head_lines: Optional[int] = None,
         tail_lines: Optional[int] = None,
         root_dir: Optional[str] = None,
-        grep_pattern: Optional[str] = None,
+        grep_pattern: Optional[List[str]] = None,
         grep_context: int = 3,
         grep_regex: bool = False,
         grep_ignore_case: bool = False,

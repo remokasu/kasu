@@ -23,7 +23,7 @@ class TextGenerator(ContentGenerator):
         head_lines: Optional[int] = None,
         tail_lines: Optional[int] = None,
         root_dir: Optional[str] = None,
-        grep_pattern: Optional[str] = None,
+        grep_pattern: Optional[List[str]] = None,
         grep_context: int = 3,
         grep_regex: bool = False,
         grep_ignore_case: bool = False,
@@ -102,9 +102,11 @@ class TextGenerator(ContentGenerator):
                     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                         file_content = f.read()
 
-                    lines = file_content.split('\n')
+                    lines = file_content.splitlines()
 
                     # grep 処理
+                    if isinstance(grep_pattern, str):
+                        grep_pattern = [grep_pattern]
                     if grep_pattern:
                         matched_ranges = self._find_grep_ranges(
                             lines,
@@ -165,7 +167,7 @@ class TextGenerator(ContentGenerator):
     @staticmethod
     def _find_grep_ranges(
         lines: List[str],
-        pattern: str,
+        patterns: List[str],
         context: int,
         use_regex: bool,
         ignore_case: bool
@@ -176,19 +178,20 @@ class TextGenerator(ContentGenerator):
         match_lines = []
         if use_regex:
             flags = re.IGNORECASE if ignore_case else 0
-            regex = re.compile(pattern, flags)
+            regexes = [re.compile(pattern, flags) for pattern in patterns]
             for i, line in enumerate(lines):
-                if regex.search(line):
+                if any(regex.search(line) for regex in regexes):
                     match_lines.append(i)
         else:
             if ignore_case:
-                needle = pattern.lower()
+                needles = [pattern.lower() for pattern in patterns]
                 for i, line in enumerate(lines):
-                    if needle in line.lower():
+                    lower = line.lower()
+                    if any(needle in lower for needle in needles):
                         match_lines.append(i)
             else:
                 for i, line in enumerate(lines):
-                    if pattern in line:
+                    if any(pattern in line for pattern in patterns):
                         match_lines.append(i)
 
         if not match_lines:

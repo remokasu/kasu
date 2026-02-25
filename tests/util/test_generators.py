@@ -145,6 +145,26 @@ class TestTextGeneratorOptions:
         assert "3 | gamma" in content
         assert stats == {}
 
+    def test_generate_with_grep_multiple_patterns(self, tmp_path):
+        """grepで複数パターンを抽出"""
+        test_file = tmp_path / "sample.txt"
+        test_file.write_text("alpha\nbeta\ngamma\ndelta\n")
+
+        file_info = {'path': str(test_file), 'size': test_file.stat().st_size, 'lines': 4}
+        generator = TextGenerator()
+        content, stats = generator.generate(
+            target_files=[file_info],
+            target_dir=str(tmp_path),
+            grep_pattern=["alpha", "delta"],
+            grep_context=0
+        )
+
+        assert "--- /sample.txt:1 ---" in content
+        assert "--- /sample.txt:4 ---" in content
+        assert "1 | alpha" in content
+        assert "4 | delta" in content
+        assert stats == {}
+
     def test_generate_with_head_lines(self, tmp_path):
         """先頭N行のみ"""
         test_file = tmp_path / "test.txt"
@@ -377,6 +397,26 @@ class TestMarkdownGeneratorOptions:
         assert "1 | alpha" in content
         assert "2 | beta" in content
         assert "3 | gamma" in content
+        assert stats == {}
+
+    def test_generate_with_grep_multiple_patterns(self, tmp_path):
+        """grepで複数パターンを抽出（Markdown）"""
+        test_file = tmp_path / "sample.md"
+        test_file.write_text("alpha\nbeta\ngamma\ndelta\n")
+
+        file_info = {'path': str(test_file), 'size': test_file.stat().st_size, 'lines': 4}
+        generator = MarkdownGenerator()
+        content, stats = generator.generate(
+            target_files=[file_info],
+            target_dir=str(tmp_path),
+            grep_pattern=["alpha", "delta"],
+            grep_context=0
+        )
+
+        assert "#### `/sample.md:1`" in content
+        assert "#### `/sample.md:4`" in content
+        assert "1 | alpha" in content
+        assert "4 | delta" in content
         assert stats == {}
 
     def test_generate_with_extension_stats(self, tmp_path):

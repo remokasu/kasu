@@ -129,6 +129,9 @@ class ConfigLoader:
             elif 'grep_pattern' in config:
                 args.grep_pattern = config['grep_pattern']
 
+        if hasattr(args, 'grep_pattern') and isinstance(args.grep_pattern, str):
+            args.grep_pattern = [args.grep_pattern]
+
         # Glob patterns (special handling)
         if args.glob is None and 'glob' in config:
             glob_patterns = config['glob']
