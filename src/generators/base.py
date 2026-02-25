@@ -15,6 +15,7 @@ class ContentGenerator(ABC):
         custom_replacements: Optional[List[Tuple[str, str]]] = None,
         head_lines: Optional[int] = None,
         tail_lines: Optional[int] = None,
+        root_dir: Optional[str] = None,
         include_tree: bool = False,
         include_list: bool = False,
         include_stats: bool = False,
@@ -32,6 +33,7 @@ class ContentGenerator(ABC):
             custom_replacements: カスタム置換パターン
             head_lines: 各ファイルの先頭N行のみ
             tail_lines: 各ファイルの末尾N行のみ
+            root_dir: 表示用ルートディレクトリ
             include_tree: ツリー構造を含めるか
             include_stats: 統計情報を含めるか
             include_merge: ファイル結合を含めるか

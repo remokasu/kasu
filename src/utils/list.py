@@ -1,17 +1,19 @@
 """ファイル一覧表示機能"""
-import os
-from typing import List, Dict
+from typing import List, Dict, Optional
 
+from utils.path_utils import format_display_path
 
 class ListBuilder:
     """ファイル一覧を生成"""
 
-    def __init__(self, base_dir: str):
+    def __init__(self, base_dir: str, root_dir: Optional[str] = None):
         """
         Args:
             base_dir: ベースディレクトリ
+            root_dir: 表示用ルートディレクトリ
         """
         self.base_dir = base_dir
+        self.root_dir = root_dir
 
     def build(self, target_files: List[Dict[str, any]]) -> str:
         """
@@ -27,14 +29,14 @@ class ListBuilder:
         
         for file_info in target_files:
             file_path = file_info['path']
-            # ベースディレクトリからの相対パスを取得
-            try:
-                rel_path = os.path.relpath(file_path, self.base_dir)
-            except ValueError:
-                # 異なるドライブなどで相対パスが作れない場合は絶対パス
-                rel_path = file_path
-            
-            lines.append(rel_path)
+            display_path = format_display_path(
+                file_path,
+                self.base_dir,
+                root_dir=self.root_dir,
+                leading_slash=False
+            )
+
+            lines.append(display_path)
 
         return "\n".join(lines)
 
@@ -56,14 +58,15 @@ class ListBuilder:
             file_path = file_info['path']
             size = file_info['size']
             line_count = file_info['lines']
-            
-            # ベースディレクトリからの相対パスを取得
-            try:
-                rel_path = os.path.relpath(file_path, self.base_dir)
-            except ValueError:
-                rel_path = file_path
-            
+
+            display_path = format_display_path(
+                file_path,
+                self.base_dir,
+                root_dir=self.root_dir,
+                leading_slash=False
+            )
+
             # フォーマット: "path (size, lines lines)"
-            lines.append(f"{rel_path} ({format_size(size)}, {line_count:,} lines)")
+            lines.append(f"{display_path} ({format_size(size)}, {line_count:,} lines)")
 
         return "\n".join(lines)

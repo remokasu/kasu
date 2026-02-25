@@ -1,6 +1,6 @@
 """ツリー表示機能"""
 import os
-from typing import List
+from typing import List, Optional
 
 
 class TreeBuilder:
@@ -10,24 +10,39 @@ class TreeBuilder:
         self.ignore_filter = ignore_filter
         self.glob_filter = glob_filter
 
-    def build(self, target_dir: str) -> str:
+    def build(self, target_dir: str, display_root: Optional[str] = None) -> str:
         """
         ディレクトリツリー構造を文字列として生成
 
         Args:
             target_dir: 検索対象のディレクトリ
+            display_root: 表示用ルートディレクトリ
 
         Returns:
             ツリー構造の文字列
         """
         lines = []
+        root_dir = display_root or target_dir
         # 絶対パスではなくベース名を表示
-        base_name = os.path.basename(os.path.abspath(target_dir))
+        base_name = os.path.basename(os.path.abspath(root_dir))
         if not base_name:  # ルートディレクトリの場合
-            base_name = target_dir
+            base_name = root_dir
         lines.append(f"{base_name}/")
 
-        self._walk_directory(target_dir, target_dir, "", lines)
+        prefix = ""
+        if display_root:
+            try:
+                rel_path = os.path.relpath(os.path.abspath(target_dir), os.path.abspath(root_dir))
+            except ValueError:
+                rel_path = None
+
+            if rel_path and rel_path not in ('.', '') and not rel_path.startswith('..'):
+                parts = rel_path.split(os.sep)
+                for part in parts:
+                    lines.append(f"{prefix}└── {part}/")
+                    prefix += "    "
+
+        self._walk_directory(target_dir, target_dir, prefix, lines)
 
         return "\n".join(lines)
 

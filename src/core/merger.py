@@ -37,6 +37,7 @@ class Merger:
         custom_replacements: Optional[List] = None,
         head_lines: Optional[int] = None,
         tail_lines: Optional[int] = None,
+        root_dir: Optional[str] = None,
         include_merge: bool = True
     ) -> None:
         """
@@ -84,7 +85,7 @@ class Merger:
         # ツリー構造を取得（show_tree が True の場合のみ）
         tree_output = None
         if show_tree and self.tree_builder:
-            tree_output = self.tree_builder.build(target_dir)
+            tree_output = self.tree_builder.build(target_dir, display_root=root_dir)
 
         # リスト構造を取得（show_list が True の場合のみ）
         list_output = None
@@ -139,6 +140,7 @@ class Merger:
             custom_replacements,
             head_lines,
             tail_lines,
+            root_dir,
             show_tree,
             show_list,
             show_stats,
@@ -157,6 +159,7 @@ class Merger:
         custom_replacements: Optional[List],
         head_lines: Optional[int],
         tail_lines: Optional[int],
+        root_dir: Optional[str],
         include_tree: bool,
         include_list: bool,
         include_stats: bool,
@@ -177,6 +180,7 @@ class Merger:
             custom_replacements,
             head_lines,
             tail_lines,
+            root_dir,
             include_tree,
             include_list,
             include_stats,

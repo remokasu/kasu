@@ -44,6 +44,12 @@ def main():
         help="Directory to search for text files"
     )
     io_group.add_argument(
+        "--root",
+        dest="root_dir",
+        metavar="DIR",
+        help="Display root directory for paths"
+    )
+    io_group.add_argument(
         "--output", "-o",
         dest="output_file",
         metavar="FILE",
@@ -256,7 +262,7 @@ def main():
     # リストビルダー（list オプションが指定されている場合のみ）
     list_builder = None
     if args.list:
-        list_builder = ListBuilder(args.target_dir)
+        list_builder = ListBuilder(args.target_dir, root_dir=args.root_dir)
 
     # ジェネレータ選択
     if args.format == 'markdown':
@@ -284,6 +290,7 @@ def main():
         custom_replacements,
         args.head,
         args.tail,
+        args.root_dir,
         not args.no_merge
     )
 

@@ -116,7 +116,7 @@ class ConfigLoader:
                 setattr(args, key, True)
 
         # String/Path options
-        for key in ['ignore_file', 'replace_file']:
+        for key in ['ignore_file', 'replace_file', 'root_dir']:
             if getattr(args, key, None) is None and key in config:
                 setattr(args, key, config[key])
 

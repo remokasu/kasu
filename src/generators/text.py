@@ -6,6 +6,7 @@ from typing import List, Dict, Tuple, Optional
 from generators.base import ContentGenerator
 from sanitizers.sanitizer import Sanitizer
 from utils.statistics import Statistics
+from utils.path_utils import format_display_path
 from utils.format_utils import format_size
 
 
@@ -20,6 +21,7 @@ class TextGenerator(ContentGenerator):
         custom_replacements: Optional[List[Tuple[str, str]]] = None,
         head_lines: Optional[int] = None,
         tail_lines: Optional[int] = None,
+        root_dir: Optional[str] = None,
         include_tree: bool = False,
         include_list: bool = False,
         include_stats: bool = False,
@@ -84,15 +86,12 @@ class TextGenerator(ContentGenerator):
             # content_parts.append("=== Files ===\n\n")
             for file_info in target_files:
                 file_path = file_info['path']
-
-                # 指定ディレクトリをルートとした絶対パス風に変換
-                try:
-                    rel_path = os.path.relpath(file_path, target_dir)
-                    # パスの区切り文字を統一（Unixスタイル）
-                    display_path = '/' + rel_path.replace(os.sep, '/')
-                except ValueError:
-                    # 異なるドライブなどで相対パスが作れない場合
-                    display_path = file_path
+                display_path = format_display_path(
+                    file_path,
+                    target_dir,
+                    root_dir=root_dir,
+                    leading_slash=True
+                )
 
                 content_parts.append(f"--- {display_path} ---\n")
 
