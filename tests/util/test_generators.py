@@ -37,7 +37,7 @@ class TestTextGeneratorBasic:
             target_dir=str(tmp_path)
         )
         
-        assert f"--- {test_file} ---" in content
+        assert "--- /test.py ---" in content
         assert "print('hello')" in content
 
     def test_generate_multiple_files(self, tmp_path):
@@ -124,6 +124,26 @@ class TestTextGeneratorOptions:
         assert "Total files:" in content
         assert "Total lines:" in content
         assert "Total size:" in content
+
+    def test_generate_with_grep(self, tmp_path):
+        """grepで周辺行のみ抽出"""
+        test_file = tmp_path / "sample.txt"
+        test_file.write_text("alpha\nbeta\ngamma\ndelta\n")
+
+        file_info = {'path': str(test_file), 'size': test_file.stat().st_size, 'lines': 4}
+        generator = TextGenerator()
+        content, stats = generator.generate(
+            target_files=[file_info],
+            target_dir=str(tmp_path),
+            grep_pattern="beta",
+            grep_context=1
+        )
+
+        assert "--- /sample.txt:1-3 ---" in content
+        assert "1 | alpha" in content
+        assert "2 | beta" in content
+        assert "3 | gamma" in content
+        assert stats == {}
 
     def test_generate_with_head_lines(self, tmp_path):
         """先頭N行のみ"""
@@ -254,7 +274,7 @@ class TestMarkdownGeneratorBasic:
         )
         
         assert "## Files" in content
-        assert f"### `{test_file}`" in content
+        assert "### `/test.py`" in content
         assert "```python" in content
         assert "def hello():" in content
         assert "```" in content
@@ -338,6 +358,26 @@ class TestMarkdownGeneratorOptions:
         assert "**Total files**:" in content
         assert "**Total lines**:" in content
         assert "**Total size**:" in content
+
+    def test_generate_with_grep(self, tmp_path):
+        """grepで周辺行のみ抽出（Markdown）"""
+        test_file = tmp_path / "sample.md"
+        test_file.write_text("alpha\nbeta\ngamma\ndelta\n")
+
+        file_info = {'path': str(test_file), 'size': test_file.stat().st_size, 'lines': 4}
+        generator = MarkdownGenerator()
+        content, stats = generator.generate(
+            target_files=[file_info],
+            target_dir=str(tmp_path),
+            grep_pattern="beta",
+            grep_context=1
+        )
+
+        assert "#### `/sample.md:1-3`" in content
+        assert "1 | alpha" in content
+        assert "2 | beta" in content
+        assert "3 | gamma" in content
+        assert stats == {}
 
     def test_generate_with_extension_stats(self, tmp_path):
         """拡張子別統計"""

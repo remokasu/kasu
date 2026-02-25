@@ -1,6 +1,7 @@
 """Markdown形式のジェネレータ"""
 import os
 import sys
+import re
 from typing import List, Dict, Tuple, Optional
 
 from generators.base import ContentGenerator
@@ -26,6 +27,10 @@ class MarkdownGenerator(ContentGenerator):
         head_lines: Optional[int] = None,
         tail_lines: Optional[int] = None,
         root_dir: Optional[str] = None,
+        grep_pattern: Optional[str] = None,
+        grep_context: int = 3,
+        grep_regex: bool = False,
+        grep_ignore_case: bool = False,
         include_tree: bool = False,
         include_list: bool = False,
         include_stats: bool = False,
@@ -122,14 +127,46 @@ class MarkdownGenerator(ContentGenerator):
                     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                         file_content = f.read()
 
+                    lines = file_content.split('\n')
+
+                    # grep 処理
+                    if grep_pattern:
+                        matched_ranges = self._find_grep_ranges(
+                            lines,
+                            grep_pattern,
+                            grep_context,
+                            grep_regex,
+                            grep_ignore_case
+                        )
+                        if not matched_ranges:
+                            # ファイル内にヒットなし
+                            content_parts.pop()  # ファイルヘッダーを取り消し
+                            continue
+
+                        for start, end in matched_ranges:
+                            range_label = f"{start + 1}" if start == end else f"{start + 1}-{end + 1}"
+                            content_parts.append(f"#### `{display_path}:{range_label}`\n\n")
+                            block_lines, block_stats = self._format_block(
+                                lines,
+                                start,
+                                end,
+                                sanitizer
+                            )
+                            for key, count in block_stats.items():
+                                all_stats[key] = all_stats.get(key, 0) + count
+                            content_parts.append("```text\n")
+                            content_parts.append(block_lines)
+                            content_parts.append("\n```\n\n")
+                        continue
+
                     # head/tail 処理
                     if head_lines is not None:
-                        lines = file_content.split('\n')[:head_lines]
+                        lines = lines[:head_lines]
                         file_content = '\n'.join(lines)
                         if len(lines) == head_lines and file_content:
                             file_content += "\n... (truncated)\n"
                     elif tail_lines is not None:
-                        lines = file_content.split('\n')[-tail_lines:]
+                        lines = lines[-tail_lines:]
                         file_content = "... (truncated)\n" + '\n'.join(lines)
 
                     # サニタイズ
@@ -154,6 +191,68 @@ class MarkdownGenerator(ContentGenerator):
                     print(f"Warning: Failed to read {file_path}: {e}", file=sys.stderr)
 
         return ''.join(content_parts), all_stats
+
+    @staticmethod
+    def _find_grep_ranges(
+        lines: List[str],
+        pattern: str,
+        context: int,
+        use_regex: bool,
+        ignore_case: bool
+    ) -> List[Tuple[int, int]]:
+        if context < 0:
+            context = 0
+
+        match_lines = []
+        if use_regex:
+            flags = re.IGNORECASE if ignore_case else 0
+            regex = re.compile(pattern, flags)
+            for i, line in enumerate(lines):
+                if regex.search(line):
+                    match_lines.append(i)
+        else:
+            if ignore_case:
+                needle = pattern.lower()
+                for i, line in enumerate(lines):
+                    if needle in line.lower():
+                        match_lines.append(i)
+            else:
+                for i, line in enumerate(lines):
+                    if pattern in line:
+                        match_lines.append(i)
+
+        if not match_lines:
+            return []
+
+        ranges = []
+        for i in match_lines:
+            start = max(0, i - context)
+            end = min(len(lines) - 1, i + context)
+            if not ranges or start > ranges[-1][1] + 1:
+                ranges.append([start, end])
+            else:
+                ranges[-1][1] = max(ranges[-1][1], end)
+
+        return [(r[0], r[1]) for r in ranges]
+
+    @staticmethod
+    def _format_block(
+        lines: List[str],
+        start: int,
+        end: int,
+        sanitizer: Sanitizer
+    ) -> Tuple[str, Dict[str, int]]:
+        width = len(str(end + 1))
+        rendered = []
+        stats: Dict[str, int] = {}
+        for idx in range(start, end + 1):
+            line = lines[idx]
+            line, line_stats = sanitizer.sanitize(line)
+            for key, count in line_stats.items():
+                stats[key] = stats.get(key, 0) + count
+            rendered.append(f"{idx + 1:>{width}} | {line}")
+
+        return "\n".join(rendered), stats
 
     def _calculate_extension_stats(self, target_files: List[Dict[str, any]]) -> Dict[str, Dict]:
         """拡張子別の統計を計算"""

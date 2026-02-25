@@ -134,6 +134,35 @@ def main():
         help="Disable automatic .gitignore detection"
     )
 
+    # 検索オプション
+    search_group = parser.add_argument_group('Search options')
+    search_group.add_argument(
+        "--grep",
+        dest="grep_pattern",
+        metavar="PATTERN",
+        help="Extract lines matching pattern with surrounding context"
+    )
+    search_group.add_argument(
+        "--context",
+        dest="grep_context",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Lines of context to include before/after matches (default: 3)"
+    )
+    search_group.add_argument(
+        "--ignore-case",
+        dest="grep_ignore_case",
+        action="store_true",
+        help="Case-insensitive search for --grep"
+    )
+    search_group.add_argument(
+        "--regex",
+        dest="grep_regex",
+        action="store_true",
+        help="Treat --grep as a regular expression"
+    )
+
     # サニタイズオプション
     sanitize_group = parser.add_argument_group('Sanitization options')
     sanitize_group.add_argument(
@@ -174,6 +203,9 @@ def main():
     # 設定ファイルを読み込み
     config = ConfigLoader.load(args.config_file)
     args = ConfigLoader.merge_with_args(config, args)
+
+    if args.grep_context is None:
+        args.grep_context = 3
 
     # target_dirのチェック（設定ファイルマージ後に実施）
     if not args.target_dir:
@@ -291,6 +323,10 @@ def main():
         args.head,
         args.tail,
         args.root_dir,
+        args.grep_pattern,
+        args.grep_context,
+        args.grep_regex,
+        args.grep_ignore_case,
         not args.no_merge
     )
 

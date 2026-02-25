@@ -38,6 +38,10 @@ class Merger:
         head_lines: Optional[int] = None,
         tail_lines: Optional[int] = None,
         root_dir: Optional[str] = None,
+        grep_pattern: Optional[str] = None,
+        grep_context: int = 3,
+        grep_regex: bool = False,
+        grep_ignore_case: bool = False,
         include_merge: bool = True
     ) -> None:
         """
@@ -54,6 +58,10 @@ class Merger:
             custom_replacements: カスタム置換パターン
             head_lines: 各ファイルの先頭N行のみ
             tail_lines: 各ファイルの末尾N行のみ
+            grep_pattern: 検索パターン
+            grep_context: 前後の行数
+            grep_regex: 正規表現として扱うか
+            grep_ignore_case: 大文字小文字を無視するか
             include_merge: ファイル結合を含めるか
         """
         # 表示のみモード判定
@@ -141,6 +149,10 @@ class Merger:
             head_lines,
             tail_lines,
             root_dir,
+            grep_pattern,
+            grep_context,
+            grep_regex,
+            grep_ignore_case,
             show_tree,
             show_list,
             show_stats,
@@ -160,6 +172,10 @@ class Merger:
         head_lines: Optional[int],
         tail_lines: Optional[int],
         root_dir: Optional[str],
+        grep_pattern: Optional[str],
+        grep_context: int,
+        grep_regex: bool,
+        grep_ignore_case: bool,
         include_tree: bool,
         include_list: bool,
         include_stats: bool,
@@ -181,6 +197,10 @@ class Merger:
             head_lines,
             tail_lines,
             root_dir,
+            grep_pattern,
+            grep_context,
+            grep_regex,
+            grep_ignore_case,
             include_tree,
             include_list,
             include_stats,

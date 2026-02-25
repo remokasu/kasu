@@ -109,9 +109,12 @@ class ConfigLoader:
         
         if getattr(args, 'tail', None) is None and 'tail' in config:
             args.tail = config['tail']
+        
+        if getattr(args, 'grep_context', None) is None and 'context' in config:
+            args.grep_context = config['context']
 
         # Boolean flags
-        for key in ['yes', 'tree', 'list', 'sanitize', 'stats', 'debug', 'no_merge', 'stdout', 'no_auto_ignore']:
+        for key in ['yes', 'tree', 'list', 'sanitize', 'stats', 'debug', 'no_merge', 'stdout', 'no_auto_ignore', 'grep_regex', 'grep_ignore_case']:
             if not getattr(args, key, False) and config.get(key, False):
                 setattr(args, key, True)
 
@@ -119,6 +122,12 @@ class ConfigLoader:
         for key in ['ignore_file', 'replace_file', 'root_dir']:
             if getattr(args, key, None) is None and key in config:
                 setattr(args, key, config[key])
+
+        if getattr(args, 'grep_pattern', None) is None:
+            if 'grep' in config:
+                args.grep_pattern = config['grep']
+            elif 'grep_pattern' in config:
+                args.grep_pattern = config['grep_pattern']
 
         # Glob patterns (special handling)
         if args.glob is None and 'glob' in config:

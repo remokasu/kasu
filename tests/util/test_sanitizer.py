@@ -132,6 +132,36 @@ MIIEpAIBAAKCAQEAyqq8Y5A...
         assert "[REDACTED_PRIVATE_KEY]" in result
         assert stats["Private Keys"] == 1
 
+    def test_sanitize_jwt(self):
+        """JWTのサニタイズ"""
+        sanitizer = Sanitizer(enable_auto_sanitize=True)
+        content = "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEyM30.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+        result, stats = sanitizer.sanitize(content)
+
+        assert "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" not in result
+        assert "[REDACTED_JWT]" in result
+        assert stats.get("JWTs", 0) >= 1
+
+    def test_sanitize_url_query_token(self):
+        """URLクエリ内トークンのサニタイズ"""
+        sanitizer = Sanitizer(enable_auto_sanitize=True)
+        content = "GET https://api.example.com/data?access_token=abcd1234efgh5678ijkl9012mnop3456"
+        result, stats = sanitizer.sanitize(content)
+
+        assert "access_token=abcd1234efgh5678ijkl9012mnop3456" not in result
+        assert "access_token=[REDACTED_QUERY_TOKEN]" in result
+        assert stats.get("URL Tokens", 0) >= 1
+
+    def test_sanitize_db_url_password(self):
+        """DB接続URL内のパスワードをサニタイズ"""
+        sanitizer = Sanitizer(enable_auto_sanitize=True)
+        content = "postgresql://user:MySecretPass@db.example.com:5432/app"
+        result, stats = sanitizer.sanitize(content)
+
+        assert "MySecretPass" not in result
+        assert "user:[REDACTED_DB_PASSWORD]@" in result
+        assert stats.get("DB Credentials", 0) >= 1
+
 
 class TestCustomReplacements:
     """カスタム置換のテスト"""
