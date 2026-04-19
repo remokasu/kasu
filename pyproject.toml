@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kasu"
-version = "0.0.6"
+version = "0.0.7"
 description = "KASU: Kind of ASsemble Utility for merging and sanitizing text files in a directory"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -39,3 +39,6 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+utils = ["*.yml"]

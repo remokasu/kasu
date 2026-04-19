@@ -86,6 +86,12 @@ def main():
         help="Include file statistics"
     )
 
+    include_group.add_argument(
+        "--outline",
+        action="store_true",
+        help="Include outline extracted from files"
+    )
+
 
     # 除外オプション
     exclude_group = parser.add_argument_group('Exclusion options')
@@ -198,12 +204,35 @@ def main():
         dest="config_file",
         help="Configuration file path (YAML format)"
     )
+    parser.add_argument(
+        "--outline-config",
+        metavar="FILE",
+        dest="outline_config",
+        help="Outline patterns configuration file (YAML format)"
+    )
 
     args = parser.parse_args()
 
     # 設定ファイルを読み込み
     config = ConfigLoader.load(args.config_file)
     args = ConfigLoader.merge_with_args(config, args)
+
+    outline_patterns = None
+    if getattr(args, 'outline_patterns', None):
+        outline_patterns = args.outline_patterns
+
+    if args.outline_config:
+        if not os.path.exists(args.outline_config):
+            print(f"Warning: Outline config file not found: {args.outline_config}", file=sys.stderr)
+        else:
+            from utils.outline import OutlineExtractor
+            loaded_patterns = OutlineExtractor.load_patterns(args.outline_config)
+            if outline_patterns:
+                for key, value in loaded_patterns.items():
+                    outline_patterns.setdefault(key, [])
+                    outline_patterns[key].extend(value)
+            else:
+                outline_patterns = loaded_patterns
 
     if args.grep_context is None:
         args.grep_context = 3
@@ -328,6 +357,8 @@ def main():
         args.grep_context,
         args.grep_regex,
         args.grep_ignore_case,
+        args.outline,
+        outline_patterns,
         not args.no_merge
     )
 

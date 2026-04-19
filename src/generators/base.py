@@ -20,6 +20,8 @@ class ContentGenerator(ABC):
         grep_context: int = 3,
         grep_regex: bool = False,
         grep_ignore_case: bool = False,
+        include_outline: bool = False,
+        outline_patterns: Optional[Dict[str, List[str]]] = None,
         include_tree: bool = False,
         include_list: bool = False,
         include_stats: bool = False,
@@ -42,6 +44,8 @@ class ContentGenerator(ABC):
             grep_context: 前後の行数
             grep_regex: 正規表現として扱うか
             grep_ignore_case: 大文字小文字を無視するか
+            include_outline: アウトラインを含めるか
+            outline_patterns: アウトライン用の追加パターン
             include_tree: ツリー構造を含めるか
             include_stats: 統計情報を含めるか
             include_merge: ファイル結合を含めるか

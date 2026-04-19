@@ -42,6 +42,8 @@ class Merger:
         grep_context: int = 3,
         grep_regex: bool = False,
         grep_ignore_case: bool = False,
+        include_outline: bool = False,
+        outline_patterns: Optional[Dict[str, List[str]]] = None,
         include_merge: bool = True
     ) -> None:
         """
@@ -62,6 +64,8 @@ class Merger:
             grep_context: 前後の行数
             grep_regex: 正規表現として扱うか
             grep_ignore_case: 大文字小文字を無視するか
+            include_outline: アウトラインを含めるか
+            outline_patterns: アウトライン用の追加パターン
             include_merge: ファイル結合を含めるか
         """
         # 表示のみモード判定
@@ -153,6 +157,8 @@ class Merger:
             grep_context,
             grep_regex,
             grep_ignore_case,
+            include_outline,
+            outline_patterns,
             show_tree,
             show_list,
             show_stats,
@@ -176,6 +182,8 @@ class Merger:
         grep_context: int,
         grep_regex: bool,
         grep_ignore_case: bool,
+        include_outline: bool,
+        outline_patterns: Optional[Dict[str, List[str]]],
         include_tree: bool,
         include_list: bool,
         include_stats: bool,
@@ -201,6 +209,8 @@ class Merger:
             grep_context,
             grep_regex,
             grep_ignore_case,
+            include_outline,
+            outline_patterns,
             include_tree,
             include_list,
             include_stats,

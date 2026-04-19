@@ -114,12 +114,12 @@ class ConfigLoader:
             args.grep_context = config['context']
 
         # Boolean flags
-        for key in ['yes', 'tree', 'list', 'sanitize', 'stats', 'debug', 'no_merge', 'stdout', 'no_auto_ignore', 'grep_regex', 'grep_ignore_case']:
+        for key in ['yes', 'tree', 'list', 'sanitize', 'stats', 'debug', 'no_merge', 'stdout', 'no_auto_ignore', 'grep_regex', 'grep_ignore_case', 'outline']:
             if not getattr(args, key, False) and config.get(key, False):
                 setattr(args, key, True)
 
         # String/Path options
-        for key in ['ignore_file', 'replace_file', 'root_dir']:
+        for key in ['ignore_file', 'replace_file', 'root_dir', 'outline_config']:
             if getattr(args, key, None) is None and key in config:
                 setattr(args, key, config[key])
 
@@ -131,6 +131,9 @@ class ConfigLoader:
 
         if hasattr(args, 'grep_pattern') and isinstance(args.grep_pattern, str):
             args.grep_pattern = [args.grep_pattern]
+
+        if getattr(args, 'outline_patterns', None) is None and 'outline_patterns' in config:
+            args.outline_patterns = config['outline_patterns']
 
         # Glob patterns (special handling)
         if args.glob is None and 'glob' in config:

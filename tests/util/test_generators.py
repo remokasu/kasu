@@ -125,6 +125,25 @@ class TestTextGeneratorOptions:
         assert "Total lines:" in content
         assert "Total size:" in content
 
+    def test_generate_with_outline(self, tmp_path):
+        """アウトライン抽出"""
+        test_file = tmp_path / "sample.py"
+        test_file.write_text("class Foo:\n    pass\n\ndef bar():\n    pass\n")
+
+        file_info = {'path': str(test_file), 'size': test_file.stat().st_size, 'lines': 5}
+        generator = TextGenerator()
+        content, stats = generator.generate(
+            target_files=[file_info],
+            target_dir=str(tmp_path),
+            include_outline=True
+        )
+
+        assert "=== Outline ===" in content
+        assert "--- /sample.py ---" in content
+        assert "class Foo" in content
+        assert "def bar" in content
+        assert stats == {}
+
     def test_generate_with_grep(self, tmp_path):
         """grepで周辺行のみ抽出"""
         test_file = tmp_path / "sample.txt"
@@ -378,6 +397,25 @@ class TestMarkdownGeneratorOptions:
         assert "**Total files**:" in content
         assert "**Total lines**:" in content
         assert "**Total size**:" in content
+
+    def test_generate_with_outline(self, tmp_path):
+        """アウトライン抽出（Markdown）"""
+        test_file = tmp_path / "sample.md"
+        test_file.write_text("# Title\n\n## Section\ntext\n")
+
+        file_info = {'path': str(test_file), 'size': test_file.stat().st_size, 'lines': 4}
+        generator = MarkdownGenerator()
+        content, stats = generator.generate(
+            target_files=[file_info],
+            target_dir=str(tmp_path),
+            include_outline=True
+        )
+
+        assert "## Outline" in content
+        assert "### `/sample.md`" in content
+        assert "`1` `# Title`" in content
+        assert "`3` `## Section`" in content
+        assert stats == {}
 
     def test_generate_with_grep(self, tmp_path):
         """grepで周辺行のみ抽出（Markdown）"""

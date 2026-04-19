@@ -9,6 +9,7 @@ from sanitizers.sanitizer import Sanitizer
 from utils.statistics import Statistics
 from utils.path_utils import format_display_path
 from utils.format_utils import format_size
+from utils.outline import OutlineExtractor
 
 
 class TextGenerator(ContentGenerator):
@@ -27,6 +28,8 @@ class TextGenerator(ContentGenerator):
         grep_context: int = 3,
         grep_regex: bool = False,
         grep_ignore_case: bool = False,
+        include_outline: bool = False,
+        outline_patterns: Optional[Dict[str, List[str]]] = None,
         include_tree: bool = False,
         include_list: bool = False,
         include_stats: bool = False,
@@ -85,6 +88,26 @@ class TextGenerator(ContentGenerator):
             if not list_structure.endswith('\n'):
                 content_parts.append('\n')
             content_parts.append("\n")
+
+        # アウトライン
+        if include_outline:
+            default_patterns = OutlineExtractor.load_default_patterns()
+            outline_content, outline_stats = self._build_outline(
+                target_files,
+                target_dir,
+                root_dir,
+                default_patterns,
+                outline_patterns,
+                sanitizer
+            )
+            for key, count in outline_stats.items():
+                all_stats[key] = all_stats.get(key, 0) + count
+            if outline_content:
+                content_parts.append("=== Outline ===\n")
+                content_parts.append(outline_content)
+                if not outline_content.endswith('\n'):
+                    content_parts.append('\n')
+                content_parts.append("\n")
 
         # ファイル結合
         if include_merge:
@@ -163,6 +186,49 @@ class TextGenerator(ContentGenerator):
                     print(f"Warning: Failed to read {file_path}: {e}", file=sys.stderr)
 
         return ''.join(content_parts), all_stats
+
+    @staticmethod
+    def _build_outline(
+        target_files: List[Dict[str, any]],
+        target_dir: str,
+        root_dir: Optional[str],
+        default_patterns: Dict[str, List[str]],
+        outline_patterns: Optional[Dict[str, List[str]]],
+        sanitizer: Sanitizer
+    ) -> Tuple[str, Dict[str, int]]:
+        parts: List[str] = []
+        all_stats: Dict[str, int] = {}
+
+        for file_info in target_files:
+            file_path = file_info['path']
+            display_path = format_display_path(
+                file_path,
+                target_dir,
+                root_dir=root_dir,
+                leading_slash=True
+            )
+
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    lines = f.read().splitlines()
+            except Exception:
+                continue
+
+            entries = OutlineExtractor.extract(file_path, lines, default_patterns, outline_patterns)
+            if not entries:
+                continue
+
+            max_line = max(line_no for line_no, _ in entries)
+            width = len(str(max_line))
+            parts.append(f"--- {display_path} ---\n")
+            for line_no, text in entries:
+                safe_text, stats = sanitizer.sanitize(text)
+                for key, count in stats.items():
+                    all_stats[key] = all_stats.get(key, 0) + count
+                parts.append(f"{line_no:>{width}} | {safe_text}\n")
+            parts.append("\n")
+
+        return ''.join(parts).rstrip(), all_stats
 
     @staticmethod
     def _find_grep_ranges(

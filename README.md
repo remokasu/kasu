@@ -15,6 +15,7 @@ AI駆動開発におけるコードベースの抽象化と管理の支援ツー
 - **設定ファイル対応** - コマンドラインオプションをYAMLで指定可能
 - **表示ルート指定** - パス表示の基準ルートを指定可能
 - **周辺抽出（grep）** - 検索語にヒットした周辺行のみ抽出
+- **アウトライン抽出** - 関数/クラス/見出しなどのアウトラインを抽出
 
 ## インストール
 
@@ -150,6 +151,31 @@ ks -i . -o output.txt --grep "token_[0-9a-f]{32}" --regex
 ```bash
 ks -i . -o output.txt --grep "jwt" --ignore-case
 ```
+
+### アウトライン抽出
+
+関数/クラス/見出しなどを抽出して、コードの全体像を素早く把握できます。
+
+```bash
+ks -i . -o output.txt --outline
+```
+
+追加パターンを指定したい場合（YAML）:
+```bash
+ks -i . -o output.txt --outline --outline-config outline.yml
+```
+
+`outline.yml` 例:
+```yaml
+patterns:
+  python:
+    - '^class\s+\w+'
+    - '^def\s+\w+'
+  all:
+    - '^TODO'
+```
+
+デフォルトのパターン定義は `outline.default.yml` にあります（必要ならコピーして編集して `--outline-config` で指定）。
 
 ### ファイル一覧を標準出力に出力
 
