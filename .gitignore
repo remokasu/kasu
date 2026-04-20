@@ -81,3 +81,7 @@ Thumbs.db
 
 # pytest
 .pytest_cache/
+
+CLAUDE.md
+.claude/
+docs/
