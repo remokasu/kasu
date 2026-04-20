@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/remokasu/kasu/schemas/kasu_output.schema.json",
+  "title": "KASU JSON Output",
+  "description": "Schema for `kasu --format json` output. SPEC-0001 FR-1 / ADR-0003.",
+  "type": "object",
+  "required": ["meta", "files"],
+  "additionalProperties": true,
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "kasu_version",
+        "target_dir",
+        "total_files",
+        "total_bytes",
+        "total_lines",
+        "total_tokens",
+        "truncated",
+        "dry_run",
+        "options"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "schema_version": { "const": "1.0" },
+        "kasu_version": { "type": "string" },
+        "target_dir": { "type": "string" },
+        "root_dir": { "type": ["string", "null"] },
+        "generated_at": { "type": ["string", "null"] },
+        "total_files": { "type": "integer", "minimum": 0 },
+        "total_bytes": { "type": "integer", "minimum": 0 },
+        "total_lines": { "type": "integer", "minimum": 0 },
+        "total_tokens": { "type": "integer", "minimum": 0 },
+        "token_method": {
+          "type": ["string", "null"],
+          "enum": ["tiktoken", "approx", null]
+        },
+        "truncated": { "type": "boolean" },
+        "truncate_reason": {
+          "type": ["string", "null"],
+          "enum": ["max_bytes", "max_tokens", null]
+        },
+        "dry_run": { "type": "boolean" },
+        "options": { "type": "object" }
+      }
+    },
+    "tree": { "type": ["string", "null"] },
+    "stats": { "type": ["object", "null"] },
+    "outline": { "type": ["object", "null"] },
+    "diff": { "type": ["string", "null"] },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "absolute_path",
+          "size",
+          "lines",
+          "tokens",
+          "encoding",
+          "language",
+          "content",
+          "truncated"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "path": { "type": "string" },
+          "absolute_path": { "type": "string" },
+          "size": { "type": "integer", "minimum": 0 },
+          "lines": { "type": "integer", "minimum": 0 },
+          "tokens": { "type": "integer", "minimum": 0 },
+          "encoding": { "type": "string" },
+          "language": { "type": "string" },
+          "content": { "type": ["string", "null"] },
+          "truncated": { "type": "boolean" }
+        }
+      }
+    },
+    "sanitize_stats": {
+      "type": ["object", "null"],
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    }
+  }
+}

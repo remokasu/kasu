@@ -1,17 +1,28 @@
 import argparse
+import datetime
 import sys
 import os
 
 from core.config import ConfigLoader
 from core.file_scanner import FileScanner
 from core.merger import Merger
+from utils.exceptions import (
+    KasuGitNotFoundError,
+    KasuInvalidGitRefError,
+    KasuNotAGitRepoError,
+)
 from generators.text import TextGenerator
 from generators.markdown import MarkdownGenerator
+from generators.json_gen import JsonGenerator
 from filters.ignore import IgnoreFilter
 from filters.glob import GlobFilter
 from sanitizers.sanitizer import Sanitizer
+from utils.git import GitIntegration
+from utils.tokenizer import TokenCounter
 from utils.tree import TreeBuilder
 from utils.list import ListBuilder
+
+KASU_VERSION = "0.0.8"
 
 
 def main():
@@ -20,6 +31,7 @@ def main():
         epilog="Examples:\n"
                "  ks -i . -o output.txt                       # Basic merge\n"
                "  ks -i . -o output.md -f md                  # Markdown format\n"
+               "  ks -i . -o output.json -f json              # JSON format (agent-friendly)\n"
                "  ks -i . -o output.txt -t                    # With tree\n"
                "  ks -i . -o output.txt --head 100            # First 100 lines per file\n"
                "  ks -i . -o output.txt --tail 50             # Last 50 lines per file\n"
@@ -30,6 +42,10 @@ def main():
                "  ks -i . -o output.txt -x 'README.md'        # Exclude specific files\n"
                "  ks -i . -o output.txt -g '*.py' -x 'test_*' # Combine glob and exclude\n"
                "  ks -i project/ -o out.txt -s                # Auto-sanitize sensitive info\n"
+               "  ks -i . -f json --since HEAD~3              # Files changed since HEAD~3\n"
+               "  ks -i . -f markdown --diff main             # Include git diff vs main\n"
+               "  ks -i . --dry-run                           # Preview files without content\n"
+               "  ks -i . -f json --token-count --max-tokens 100000 # Bound output for LLM context\n"
                "  ks --config config.yaml                     # Use config file\n"
                "  ks -c config.yaml -o custom.txt             # Config + override\n",
         formatter_class=argparse.RawDescriptionHelpFormatter
@@ -62,9 +78,15 @@ def main():
     )
     io_group.add_argument(
         "--format", "-f",
-        choices=['text', 'markdown', 'md'],
+        choices=['text', 'markdown', 'md', 'json'],
         default='text',
         help="Output format (default: text)"
+    )
+    io_group.add_argument(
+        "--absolute-paths",
+        dest="absolute_paths",
+        action="store_true",
+        help="Emit file paths as absolute paths (useful for agents)"
     )
 
     # 情報追加オプション
@@ -90,6 +112,13 @@ def main():
         "--outline",
         action="store_true",
         help="Include outline extracted from files"
+    )
+
+    include_group.add_argument(
+        "--token-count",
+        dest="token_count",
+        action="store_true",
+        help="Include token count (uses tiktoken if installed, else approximation)"
     )
 
 
@@ -139,6 +168,26 @@ def main():
         action="store_true",
         help="Disable automatic .gitignore detection"
     )
+    filter_group.add_argument(
+        "--since",
+        dest="since",
+        metavar="REF",
+        help="Only include files changed since the given git ref (e.g., HEAD~3, main)"
+    )
+    filter_group.add_argument(
+        "--max-tokens",
+        dest="max_tokens",
+        type=int,
+        metavar="N",
+        help="Truncate output when total tokens exceed N (file-level truncation)"
+    )
+    filter_group.add_argument(
+        "--max-bytes",
+        dest="max_bytes",
+        type=int,
+        metavar="N",
+        help="Truncate output when total bytes exceed N (file-level truncation)"
+    )
 
     # 検索オプション
     search_group = parser.add_argument_group('Search options')
@@ -169,6 +218,12 @@ def main():
         action="store_true",
         help="Treat --grep as a regular expression"
     )
+    search_group.add_argument(
+        "--diff",
+        dest="diff_ref",
+        metavar="REF",
+        help="Include 'git diff <REF>...HEAD' output as a section"
+    )
 
     # サニタイズオプション
     sanitize_group = parser.add_argument_group('Sanitization options')
@@ -195,6 +250,12 @@ def main():
         "--debug", "-d",
         action="store_true",
         help="Show debug information"
+    )
+    control_group.add_argument(
+        "--dry-run",
+        dest="dry_run",
+        action="store_true",
+        help="Preview target files and sizes without emitting file content"
     )
 
     # その他
@@ -243,19 +304,28 @@ def main():
 
     # 表示のみモード（tree, stats, list のいずれか）
     display_only_mode = (args.tree or args.stats or args.list) \
-                        and not args.output_file and not args.stdout
+                        and not args.output_file and not args.stdout \
+                        and not args.dry_run
+
+    # dry_run は必ず出力先が要る
+    if args.dry_run and not args.output_file and not args.stdout:
+        parser.error("--dry-run requires --output/-o or --stdout")
 
     # output_fileチェック
     if not args.stdout and not display_only_mode and not args.output_file:
         parser.error("--output/-o is required unless using --stdout, --tree, or --stats")
-    
+
     # 出力ファイルパスが空文字列でないかチェック
     if args.output_file is not None and args.output_file.strip() == "":
         parser.error("Output file path cannot be empty")
-    
+
     # --head と --tail の排他チェック
     if args.head and args.tail:
         parser.error("Cannot use both --head and --tail at the same time")
+
+    # --absolute-paths と --root の排他チェック
+    if args.absolute_paths and args.root_dir:
+        parser.error("Cannot use --absolute-paths with --root")
 
     # target_dirが存在するかチェック
     if not os.path.exists(args.target_dir):
@@ -306,7 +376,7 @@ def main():
         ignore_patterns = IgnoreFilter.load_patterns_from_multiple(ignore_files)
     if exclude_patterns:
         ignore_patterns.extend(exclude_patterns)
-    
+
     if ignore_patterns:
         ignore_filter = IgnoreFilter(ignore_patterns, args.target_dir, args.debug, auto_vcs_ignore)
         filters.append(ignore_filter)
@@ -315,6 +385,43 @@ def main():
         filters.append(ignore_filter)
 
     scanner = FileScanner(filters, args.debug)
+
+    # Git 連携（--since / --diff）
+    git_integration = None
+    since_paths = None
+    diff_text = None
+    if args.since or args.diff_ref:
+        try:
+            git_integration = GitIntegration(args.target_dir)
+        except (KasuGitNotFoundError, KasuNotAGitRepoError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(2)
+
+        if args.since:
+            try:
+                since_paths = git_integration.list_changed_files(args.since)
+            except KasuInvalidGitRefError as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(2)
+
+        if args.diff_ref:
+            try:
+                diff_text = git_integration.get_diff(args.diff_ref)
+            except KasuInvalidGitRefError as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(2)
+
+    # TokenCounter の初期化（--token-count / --format json / --max-tokens 時）
+    token_counter = None
+    needs_tokens = args.token_count or args.format == 'json' or args.max_tokens is not None
+    if needs_tokens:
+        token_counter = TokenCounter()
+        if token_counter.method == 'approx':
+            print(
+                "Info: Using approximate token count "
+                "(install 'kasu[tokens]' for tiktoken)",
+                file=sys.stderr,
+            )
 
     # ツリービルダー（tree オプションが指定されている場合のみ）
     tree_builder = None
@@ -327,7 +434,9 @@ def main():
         list_builder = ListBuilder(args.target_dir, root_dir=args.root_dir)
 
     # ジェネレータ選択
-    if args.format == 'markdown':
+    if args.format == 'json':
+        generator = JsonGenerator()
+    elif args.format == 'markdown':
         generator = MarkdownGenerator()
     else:
         generator = TextGenerator()
@@ -339,27 +448,55 @@ def main():
         else:
             custom_replacements = Sanitizer.load_replacement_patterns(args.replace_file)
 
+    # Render context for generators (mostly used by JsonGenerator)
+    render_context = {
+        'kasu_version': KASU_VERSION,
+        'generated_at': datetime.datetime.now().astimezone().isoformat(timespec='seconds'),
+        'token_counter': token_counter,
+        'show_tokens': args.token_count,
+        'cli_options': {
+            'since': args.since,
+            # CLI args.dest は ``diff_ref`` だが、JSON schema の meta.options は
+            # CLI フラグ名 ``--diff`` に合わせて ``diff`` で出す
+            'diff': args.diff_ref,
+            'format': args.format,
+            'sanitize': bool(args.sanitize),
+            'max_tokens': args.max_tokens,
+            'max_bytes': args.max_bytes,
+            'absolute_paths': bool(args.absolute_paths),
+            'dry_run': bool(args.dry_run),
+        },
+    }
+
     merger = Merger(scanner, generator, tree_builder, list_builder)
     merger.merge(
-        args.target_dir,
-        args.output_file,
-        args.stdout,
-        args.tree,
-        args.list,
-        args.stats,
-        args.yes,
-        args.sanitize,
-        custom_replacements,
-        args.head,
-        args.tail,
-        args.root_dir,
-        args.grep_pattern,
-        args.grep_context,
-        args.grep_regex,
-        args.grep_ignore_case,
-        args.outline,
-        outline_patterns,
-        not args.no_merge
+        target_dir=args.target_dir,
+        output_file=args.output_file,
+        to_stdout=args.stdout,
+        show_tree=args.tree,
+        show_list=args.list,
+        show_stats=args.stats,
+        skip_confirm=args.yes,
+        enable_sanitize=args.sanitize,
+        custom_replacements=custom_replacements,
+        head_lines=args.head,
+        tail_lines=args.tail,
+        root_dir=args.root_dir,
+        grep_pattern=args.grep_pattern,
+        grep_context=args.grep_context,
+        grep_regex=args.grep_regex,
+        grep_ignore_case=args.grep_ignore_case,
+        include_outline=args.outline,
+        outline_patterns=outline_patterns,
+        include_merge=not args.no_merge,
+        dry_run=args.dry_run,
+        absolute_paths=args.absolute_paths,
+        max_tokens=args.max_tokens,
+        max_bytes=args.max_bytes,
+        token_counter=token_counter,
+        since_paths=since_paths,
+        diff_text=diff_text,
+        render_context=render_context,
     )
 
 

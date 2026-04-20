@@ -1,6 +1,6 @@
 """コンテンツジェネレータの基底クラス"""
 from abc import ABC, abstractmethod
-from typing import List, Dict, Tuple, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class ContentGenerator(ABC):
@@ -28,6 +28,9 @@ class ContentGenerator(ABC):
         include_merge: bool = True,
         tree_structure: Optional[str] = None,
         list_structure: Optional[str] = None,
+        absolute_paths: bool = False,
+        diff_text: Optional[str] = None,
+        render_context: Optional[Dict[str, Any]] = None,
     ) -> Tuple[str, Dict[str, int]]:
         """
         ファイルリストからコンテンツを生成
@@ -47,9 +50,17 @@ class ContentGenerator(ABC):
             include_outline: アウトラインを含めるか
             outline_patterns: アウトライン用の追加パターン
             include_tree: ツリー構造を含めるか
+            include_list: ファイル一覧を含めるか
             include_stats: 統計情報を含めるか
             include_merge: ファイル結合を含めるか
             tree_structure: ツリー構造文字列
+            list_structure: ファイル一覧文字列
+            absolute_paths: ファイルパスを絶対パスで出力するか
+            diff_text: ``git diff`` の生出力（``--diff`` 指定時のみ）
+            render_context: JsonGenerator 用のメタ情報辞書
+                （``kasu_version`` / ``token_counter`` / ``truncated`` /
+                ``truncate_reason`` / ``dry_run`` / ``cli_options``）。
+                text / markdown generator は無視する。
 
         Returns:
             (生成されたコンテンツ, サニタイズ統計)

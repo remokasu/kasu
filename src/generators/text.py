@@ -2,7 +2,7 @@
 import sys
 import os
 import re
-from typing import List, Dict, Tuple, Optional
+from typing import Any, List, Dict, Tuple, Optional
 
 from generators.base import ContentGenerator
 from sanitizers.sanitizer import Sanitizer
@@ -35,13 +35,19 @@ class TextGenerator(ContentGenerator):
         include_stats: bool = False,
         include_merge: bool = True,
         tree_structure: Optional[str] = None,
-        list_structure: Optional[str] = None
+        list_structure: Optional[str] = None,
+        absolute_paths: bool = False,
+        diff_text: Optional[str] = None,
+        render_context: Optional[Dict[str, Any]] = None,
     ) -> Tuple[str, Dict[str, int]]:
         """テキスト形式でコンテンツを生成"""
         content_parts = []
         all_stats = {}
 
         sanitizer = Sanitizer(enable_sanitize, custom_replacements)
+        ctx = render_context or {}
+        token_counter = ctx.get('token_counter')
+        show_tokens = bool(ctx.get('show_tokens'))
 
         # ベースディレクトリ名を取得
         base_name = os.path.basename(os.path.abspath(target_dir))
@@ -51,12 +57,14 @@ class TextGenerator(ContentGenerator):
 
         # 統計情報
         if include_stats:
-            stats = Statistics.calculate(target_files)
+            stats = Statistics.calculate(target_files, token_counter=token_counter if show_tokens else None)
             content_parts.append("=== Statistics ===\n")
             content_parts.append(f"Total files: {stats['total_files']:,}\n")
             content_parts.append(f"Total lines: {stats['total_lines']:,}\n")
             content_parts.append(f"Total size: {format_size(stats['total_size'])}\n")
-            
+            if show_tokens:
+                content_parts.append(f"Total tokens: {stats.get('total_tokens', 0):,}\n")
+
             if stats['by_extension']:
                 content_parts.append("\nBy extension:\n")
                 sorted_exts = sorted(
@@ -65,12 +73,15 @@ class TextGenerator(ContentGenerator):
                     reverse=True
                 )
                 for ext, ext_stats in sorted_exts:
-                    content_parts.append(
+                    line = (
                         f"  {ext:15} {ext_stats['count']:4} files  "
                         f"{ext_stats['lines']:6,} lines  "
-                        f"{format_size(ext_stats['size']):>10}\n"
+                        f"{format_size(ext_stats['size']):>10}"
                     )
-            
+                    if show_tokens:
+                        line += f"  {ext_stats.get('tokens', 0):>8,} tokens"
+                    content_parts.append(line + "\n")
+
             content_parts.append("\n")
 
         # ディレクトリツリー
@@ -89,6 +100,14 @@ class TextGenerator(ContentGenerator):
                 content_parts.append('\n')
             content_parts.append("\n")
 
+        # Diff セクション（--diff 指定時）
+        if diff_text:
+            content_parts.append("=== Diff ===\n")
+            content_parts.append(diff_text)
+            if not diff_text.endswith('\n'):
+                content_parts.append('\n')
+            content_parts.append("\n")
+
         # アウトライン
         if include_outline:
             default_patterns = OutlineExtractor.load_default_patterns()
@@ -98,7 +117,8 @@ class TextGenerator(ContentGenerator):
                 root_dir,
                 default_patterns,
                 outline_patterns,
-                sanitizer
+                sanitizer,
+                absolute_paths,
             )
             for key, count in outline_stats.items():
                 all_stats[key] = all_stats.get(key, 0) + count
@@ -114,12 +134,15 @@ class TextGenerator(ContentGenerator):
             content_parts.append("=== Files ===\n\n")
             for file_info in target_files:
                 file_path = file_info['path']
-                display_path = format_display_path(
-                    file_path,
-                    target_dir,
-                    root_dir=root_dir,
-                    leading_slash=True
-                )
+                if absolute_paths:
+                    display_path = os.path.abspath(file_path)
+                else:
+                    display_path = format_display_path(
+                        file_path,
+                        target_dir,
+                        root_dir=root_dir,
+                        leading_slash=True
+                    )
 
                 try:
                     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -194,19 +217,23 @@ class TextGenerator(ContentGenerator):
         root_dir: Optional[str],
         default_patterns: Dict[str, List[str]],
         outline_patterns: Optional[Dict[str, List[str]]],
-        sanitizer: Sanitizer
+        sanitizer: Sanitizer,
+        absolute_paths: bool = False,
     ) -> Tuple[str, Dict[str, int]]:
         parts: List[str] = []
         all_stats: Dict[str, int] = {}
 
         for file_info in target_files:
             file_path = file_info['path']
-            display_path = format_display_path(
-                file_path,
-                target_dir,
-                root_dir=root_dir,
-                leading_slash=True
-            )
+            if absolute_paths:
+                display_path = os.path.abspath(file_path)
+            else:
+                display_path = format_display_path(
+                    file_path,
+                    target_dir,
+                    root_dir=root_dir,
+                    leading_slash=True
+                )
 
             try:
                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:

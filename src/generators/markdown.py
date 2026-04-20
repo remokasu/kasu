@@ -2,7 +2,7 @@
 import os
 import sys
 import re
-from typing import List, Dict, Tuple, Optional
+from typing import Any, List, Dict, Tuple, Optional
 
 from generators.base import ContentGenerator
 from sanitizers.sanitizer import Sanitizer
@@ -39,7 +39,10 @@ class MarkdownGenerator(ContentGenerator):
         include_stats: bool = False,
         include_merge: bool = True,
         tree_structure: Optional[str] = None,
-        list_structure: Optional[str] = None
+        list_structure: Optional[str] = None,
+        absolute_paths: bool = False,
+        diff_text: Optional[str] = None,
+        render_context: Optional[Dict[str, Any]] = None,
     ) -> Tuple[str, Dict[str, int]]:
         """
         Markdown形式でコンテンツを生成
@@ -63,6 +66,9 @@ class MarkdownGenerator(ContentGenerator):
         all_stats = {}
 
         sanitizer = Sanitizer(enable_sanitize, custom_replacements)
+        ctx = render_context or {}
+        token_counter = ctx.get('token_counter')
+        show_tokens = bool(ctx.get('show_tokens'))
 
         # サマリー統計
         if include_stats:
@@ -72,18 +78,31 @@ class MarkdownGenerator(ContentGenerator):
             content_parts.append("## Summary\n\n")
             content_parts.append(f"- **Total files**: {len(target_files)}\n")
             content_parts.append(f"- **Total lines**: {total_lines:,}\n")
-            content_parts.append(f"- **Total size**: {format_size(total_size)}\n\n")
+            content_parts.append(f"- **Total size**: {format_size(total_size)}\n")
+            if show_tokens and token_counter is not None:
+                total_tokens = self._sum_tokens(target_files, token_counter)
+                content_parts.append(f"- **Total tokens**: {total_tokens:,}\n")
+            content_parts.append("\n")
 
             # 拡張子別の統計
-            ext_stats = self._calculate_extension_stats(target_files)
+            ext_stats = self._calculate_extension_stats(target_files, token_counter if show_tokens else None)
             if ext_stats:
                 content_parts.append("### By Extension\n\n")
-                content_parts.append("| Extension | Files | Lines | Size |\n")
-                content_parts.append("|-----------|-------|-------|------|\n")
-                for ext, stats in sorted(ext_stats.items(), key=lambda x: x[1]['count'], reverse=True):
-                    content_parts.append(
-                        f"| {ext} | {stats['count']} | {stats['lines']:,} | {format_size(stats['size'])} |\n"
-                    )
+                if show_tokens:
+                    content_parts.append("| Extension | Files | Lines | Size | Tokens |\n")
+                    content_parts.append("|-----------|-------|-------|------|--------|\n")
+                    for ext, stats in sorted(ext_stats.items(), key=lambda x: x[1]['count'], reverse=True):
+                        content_parts.append(
+                            f"| {ext} | {stats['count']} | {stats['lines']:,} | "
+                            f"{format_size(stats['size'])} | {stats.get('tokens', 0):,} |\n"
+                        )
+                else:
+                    content_parts.append("| Extension | Files | Lines | Size |\n")
+                    content_parts.append("|-----------|-------|-------|------|\n")
+                    for ext, stats in sorted(ext_stats.items(), key=lambda x: x[1]['count'], reverse=True):
+                        content_parts.append(
+                            f"| {ext} | {stats['count']} | {stats['lines']:,} | {format_size(stats['size'])} |\n"
+                        )
                 content_parts.append("\n")
 
             content_parts.append("---\n\n")
@@ -108,6 +127,16 @@ class MarkdownGenerator(ContentGenerator):
             content_parts.append("```\n\n")
             content_parts.append("---\n\n")
 
+        # Diff セクション（--diff 指定時）
+        if diff_text:
+            content_parts.append("## Diff\n\n")
+            content_parts.append("```diff\n")
+            content_parts.append(diff_text)
+            if not diff_text.endswith('\n'):
+                content_parts.append('\n')
+            content_parts.append("```\n\n")
+            content_parts.append("---\n\n")
+
         # アウトライン
         if include_outline:
             default_patterns = OutlineExtractor.load_default_patterns()
@@ -117,7 +146,8 @@ class MarkdownGenerator(ContentGenerator):
                 root_dir,
                 default_patterns,
                 outline_patterns,
-                sanitizer
+                sanitizer,
+                absolute_paths,
             )
             for key, count in outline_stats.items():
                 all_stats[key] = all_stats.get(key, 0) + count
@@ -134,12 +164,15 @@ class MarkdownGenerator(ContentGenerator):
 
             for file_info in target_files:
                 file_path = file_info['path']
-                display_path = format_display_path(
-                    file_path,
-                    target_dir,
-                    root_dir=root_dir,
-                    leading_slash=True
-                )
+                if absolute_paths:
+                    display_path = os.path.abspath(file_path)
+                else:
+                    display_path = format_display_path(
+                        file_path,
+                        target_dir,
+                        root_dir=root_dir,
+                        leading_slash=True
+                    )
 
                 language = LanguageMapper.get_language(file_path)
 
@@ -224,19 +257,23 @@ class MarkdownGenerator(ContentGenerator):
         root_dir: Optional[str],
         default_patterns: Dict[str, List[str]],
         outline_patterns: Optional[Dict[str, List[str]]],
-        sanitizer: Sanitizer
+        sanitizer: Sanitizer,
+        absolute_paths: bool = False,
     ) -> Tuple[str, Dict[str, int]]:
         parts: List[str] = []
         all_stats: Dict[str, int] = {}
 
         for file_info in target_files:
             file_path = file_info['path']
-            display_path = format_display_path(
-                file_path,
-                target_dir,
-                root_dir=root_dir,
-                leading_slash=True
-            )
+            if absolute_paths:
+                display_path = os.path.abspath(file_path)
+            else:
+                display_path = format_display_path(
+                    file_path,
+                    target_dir,
+                    root_dir=root_dir,
+                    leading_slash=True
+                )
 
             try:
                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -321,14 +358,43 @@ class MarkdownGenerator(ContentGenerator):
 
         return "\n".join(rendered), stats
 
-    def _calculate_extension_stats(self, target_files: List[Dict[str, any]]) -> Dict[str, Dict]:
+    def _calculate_extension_stats(
+        self,
+        target_files: List[Dict[str, any]],
+        token_counter=None,
+    ) -> Dict[str, Dict]:
         """拡張子別の統計を計算"""
         stats = {}
         for file_info in target_files:
             ext = os.path.splitext(file_info['path'])[1] or '(no extension)'
             if ext not in stats:
-                stats[ext] = {'count': 0, 'lines': 0, 'size': 0}
+                stats[ext] = {'count': 0, 'lines': 0, 'size': 0, 'tokens': 0}
             stats[ext]['count'] += 1
             stats[ext]['lines'] += file_info['lines']
             stats[ext]['size'] += file_info['size']
+            if token_counter is not None:
+                tokens = file_info.get('tokens')
+                if tokens is None:
+                    tokens = self._count_tokens(file_info['path'], token_counter)
+                    file_info['tokens'] = tokens
+                stats[ext]['tokens'] += tokens
         return stats
+
+    @staticmethod
+    def _count_tokens(file_path: str, token_counter) -> int:
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                return token_counter.count(f.read())
+        except (OSError, UnicodeDecodeError):
+            return 0
+
+    @classmethod
+    def _sum_tokens(cls, target_files: List[Dict[str, any]], token_counter) -> int:
+        total = 0
+        for file_info in target_files:
+            tokens = file_info.get('tokens')
+            if tokens is None:
+                tokens = cls._count_tokens(file_info['path'], token_counter)
+                file_info['tokens'] = tokens
+            total += tokens
+        return total

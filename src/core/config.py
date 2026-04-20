@@ -38,7 +38,7 @@ class ConfigLoader:
             except yaml.YAMLError as e:
                 print(f"Error: Invalid YAML in config file {config_path}: {e}", file=sys.stderr)
                 sys.exit(1)
-            except Exception as e:
+            except (OSError, UnicodeDecodeError) as e:
                 print(f"Error: Cannot read config file {config_path}: {e}", file=sys.stderr)
                 sys.exit(1)
 
@@ -106,22 +106,36 @@ class ConfigLoader:
         # Integer options
         if getattr(args, 'head', None) is None and 'head' in config:
             args.head = config['head']
-        
+
         if getattr(args, 'tail', None) is None and 'tail' in config:
             args.tail = config['tail']
-        
+
         if getattr(args, 'grep_context', None) is None and 'context' in config:
             args.grep_context = config['context']
 
+        if getattr(args, 'max_tokens', None) is None and 'max_tokens' in config:
+            args.max_tokens = config['max_tokens']
+
+        if getattr(args, 'max_bytes', None) is None and 'max_bytes' in config:
+            args.max_bytes = config['max_bytes']
+
         # Boolean flags
-        for key in ['yes', 'tree', 'list', 'sanitize', 'stats', 'debug', 'no_merge', 'stdout', 'no_auto_ignore', 'grep_regex', 'grep_ignore_case', 'outline']:
+        for key in [
+            'yes', 'tree', 'list', 'sanitize', 'stats', 'debug', 'no_merge',
+            'stdout', 'no_auto_ignore', 'grep_regex', 'grep_ignore_case',
+            'outline', 'dry_run', 'absolute_paths', 'token_count',
+        ]:
             if not getattr(args, key, False) and config.get(key, False):
                 setattr(args, key, True)
 
         # String/Path options
-        for key in ['ignore_file', 'replace_file', 'root_dir', 'outline_config']:
+        for key in ['ignore_file', 'replace_file', 'root_dir', 'outline_config', 'since']:
             if getattr(args, key, None) is None and key in config:
                 setattr(args, key, config[key])
+
+        # diff_ref は YAML キー名 'diff' で受ける（CLI dest と対応づけ）
+        if getattr(args, 'diff_ref', None) is None and 'diff' in config:
+            args.diff_ref = config['diff']
 
         if getattr(args, 'grep_pattern', None) is None:
             if 'grep' in config:

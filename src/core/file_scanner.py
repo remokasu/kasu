@@ -65,6 +65,51 @@ class FileScanner:
 
         return target_files
 
+    def scan_from_paths(self, target_dir: str, paths: List[str]) -> List[Dict[str, any]]:
+        """指定されたパスリストからファイル情報を収集
+
+        ``os.walk`` を使わず、呼び出し側が決めたファイル集合に対して
+        フィルタとシンボリックリンク除外を適用する（``--since``
+        で git から得たファイルリストを scanner に載せる用途）。
+
+        Args:
+            target_dir: 表示用の基準ディレクトリ。
+            paths: 対象ファイルのパス（``target_dir`` からの相対 or 絶対）。
+
+        Returns:
+            ``_get_file_info`` で取得したファイル情報のリスト。
+        """
+        self.stats = {
+            'scanned': 0,
+            'glob_filtered': 0,
+            'ignored': 0,
+            'included': 0,
+        }
+
+        target_files: List[Dict[str, any]] = []
+        for path in paths:
+            file_path = path if os.path.isabs(path) else os.path.join(target_dir, path)
+
+            if not os.path.exists(file_path) or not os.path.isfile(file_path):
+                continue
+            if os.path.islink(file_path):
+                if self.debug:
+                    print(f"[SKIPPED SYMLINK] {file_path}")
+                continue
+
+            self.stats['scanned'] += 1
+
+            filter_result = self._apply_filters(file_path)
+            if filter_result != 'included':
+                if filter_result in self.stats:
+                    self.stats[filter_result] += 1
+                continue
+
+            target_files.append(self._get_file_info(file_path))
+            self.stats['included'] += 1
+
+        return target_files
+
     def get_stats(self) -> Dict[str, int]:
         """
         スキャン統計を取得
